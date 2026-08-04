@@ -59,12 +59,21 @@
 
 ## Chạy
 
-### Backend (Docker)
+### Backend (Docker) — dùng chung Postgres/Redis với NOXH
+
+Yêu cầu: NOXH infra đang chạy (`noxh-postgres` :55432, `noxh-redis` :56379).
+
 ```bash
 cd backend
-docker compose up -d          # Khởi động API + PostgreSQL
-docker compose logs -f api    # Theo dõi log
+./scripts/init-shared-db.sh   # lần đầu: tạo DB haisanhanoi + migrate
+docker compose up -d --build  # api :3100, admin :3101
+docker compose logs -f api
 ```
+
+| Service | Port host |
+|---|---|
+| API | **3100** |
+| Admin (nginx) | **3101** |
 
 ### Mobile App (Expo)
 ```bash

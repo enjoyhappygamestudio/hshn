@@ -1,4 +1,8 @@
-version: "3.8"
+# HaiSanHaNoi — dùng chung Postgres + Redis với NOXH (network `noxh_default`).
+# Yêu cầu: NOXH infra đang chạy (`noxh-postgres`, `noxh-redis`).
+# Khởi tạo DB lần đầu: ./scripts/init-shared-db.sh
+
+name: haisanhanoi
 
 services:
   api:
@@ -7,18 +11,22 @@ services:
       dockerfile: Dockerfile
     container_name: haisanhanoi-api
     ports:
-      - "4000:4000"
+      - "3100:3100"
     environment:
       - NODE_ENV=production
-      - DB_HOST=db
+      - PORT=3100
+      # Shared Postgres (container NOXH) — DB riêng `haisanhanoi`, không đụng schema `noxh`
+      - DB_HOST=noxh-postgres
       - DB_PORT=5432
       - DB_NAME=haisanhanoi
       - DB_USER=hshn_user
       - DB_PASS=hshn_pass
+      - DATABASE_URL=postgresql://hshn_user:hshn_pass@noxh-postgres:5432/haisanhanoi
       - JWT_SECRET=hshn-jwt-secret-change-in-production
       - JWT_EXPIRES_IN=7d
       - HARD_SHIP_TIMEOUT_MIN=${HARD_SHIP_TIMEOUT_MIN:-10}
-      - REDIS_URL=redis://redis:6379
+      # Shared Redis — DB index 1 (NOXH dùng 0) để tránh conflict key
+      - REDIS_URL=redis://noxh-redis:6379/1
       - R2_ENABLED=${R2_ENABLED:-false}
       - R2_ENDPOINT=${R2_ENDPOINT:-}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
@@ -53,11 +61,9 @@ services:
       - BEE_ENABLED=${BEE_ENABLED:-false}
       - BEE_API_URL=${BEE_API_URL:-https://api.be.com.vn}
       - BEE_TOKEN=${BEE_TOKEN:-}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    networks:
+      - default
+      - noxh_shared
     restart: unless-stopped
     volumes:
       - api_logs:/app/logs
@@ -69,56 +75,16 @@ services:
       dockerfile: admin/Dockerfile
     container_name: haisanhanoi-admin
     ports:
-      - "5050:80"
+      - "3101:80"
     depends_on:
       - api
     restart: unless-stopped
 
-  db:
-    image: postgres:16-alpine
-    container_name: haisanhanoi-db
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=haisanhanoi
-      - POSTGRES_USER=hshn_user
-      - POSTGRES_PASSWORD=hshn_pass
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
-      - ./migrations/002_admin_users.sql:/docker-entrypoint-initdb.d/002_admin_users.sql
-      - ./seeds/seed.sql:/docker-entrypoint-initdb.d/003_seed.sql
-      - ./migrations/004_chat_video_shipping.sql:/docker-entrypoint-initdb.d/004_chat_video_shipping.sql
-      - ./migrations/006_video_comments.sql:/docker-entrypoint-initdb.d/006_video_comments.sql
-      - ./migrations/007_ahamove_shipping.sql:/docker-entrypoint-initdb.d/007_ahamove_shipping.sql
-      - ./migrations/009_product_weight.sql:/docker-entrypoint-initdb.d/009_product_weight.sql
-      - ./migrations/010_hard_to_ship.sql:/docker-entrypoint-initdb.d/010_hard_to_ship.sql
-      - ./migrations/011_order_status_7.sql:/docker-entrypoint-initdb.d/011_order_status_7.sql
-      - ./migrations/012_categories.sql:/docker-entrypoint-initdb.d/012_categories.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hshn_user -d haisanhanoi"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: haisanhanoi-redis
-    ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
 volumes:
-  postgres_data:
   api_logs:
   api_uploads:
-  redis_data:
+
+networks:
+  noxh_shared:
+    external: true
+    name: noxh_default

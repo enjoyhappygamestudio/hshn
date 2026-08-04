@@ -1,3 +1,27 @@
+# Session: 2026-08-05
+
+## Hành động
+
+```
+Mã: INFRA-01
+Mô tả: Dùng chung Postgres/Redis với NOXH + đổi port HSHN sang 3100–31xx
+```
+
+## Cấu hình hiện tại
+
+| Service | Port host |
+|---|---|
+| `haisanhanoi-api` | **3100** |
+| `haisanhanoi-admin` | **3101** |
+| `noxh-postgres` (shared) | 55432 — DB riêng `haisanhanoi` |
+| `noxh-redis` (shared) | 56379 — Redis DB index `/1` |
+
+- `docker-compose.yml`: chỉ còn `api` + `admin`; join network `noxh_default`; không còn `haisanhanoi-db` / `haisanhanoi-redis`
+- `admin/nginx.conf`: proxy `/api` & `/uploads` → `http://api:3100`
+- Cloudflare tunnel nên trỏ **admin 3101**
+
+---
+
 # Session: 2026-08-04
 
 ## Hành động
@@ -50,7 +74,7 @@ Mô tả: Chuyển upload ảnh & video sang Cloudflare R2 (code xong, chờ key
 
 ## Test (2026-08-03)
 
-- Với `R2_ENABLED=false` (fallback local): `POST /api/admin/upload/image` → `/uploads/images/...` (file có trong container, GET qua nginx 5050 + api 4000 đều 200); video upload → `/uploads/videos/...` OK. Đã xóa data test.
+- Với `R2_ENABLED=false` (fallback local): `POST /api/admin/upload/image` → `/uploads/images/...` (file có trong container, GET qua nginx 3101 + api 3100 đều 200); video upload → `/uploads/videos/...` OK. Đã xóa data test.
 - Build backend + Docker rebuild api & admin OK.
 
 ## Khi có key R2
@@ -71,22 +95,22 @@ Mô tả: Tách Docker thành 4 container riêng: api, admin, db, redis
 ## File đã tạo/sửa (2026-08-03)
 
 - `backend/admin/Dockerfile` — **file mới**: nginx:alpine phục vụ web admin (index.html/app.js/styles.css)
-- `backend/admin/nginx.conf` — **file mới**: root admin + proxy `/api` & `/uploads` → api:4000, client_max_body_size 100m
+- `backend/admin/nginx.conf` — **file mới**: root admin + proxy `/api` & `/uploads` → api:3100, client_max_body_size 100m
 - `backend/Dockerfile` — bỏ `COPY --from=builder /app/admin ./admin` (admin tách riêng, image api gọn hơn)
 - `backend/src/app.ts` — bỏ block "Serve admin frontend" (route `/admin` static + fallback) — giờ API thuần, `/admin/` trả 404
-- `backend/docker-compose.yml` — 4 service: `api` (4000, có `REDIS_URL`, depends_on db+redis healthy), `admin` (nginx **5050**:80, depends_on api), `db` (5432, giữ nguyên init scripts), `redis` (redis:7-alpine, **6379**, appendonly, volume redis_data, healthcheck)
-- `backend/.env.example` — thêm `REDIS_URL=redis://localhost:6379`
+- `backend/docker-compose.yml` — service `api` (**3100**, `REDIS_URL`) + `admin` (nginx **3101**:80); Postgres/Redis dùng chung NOXH
+- `backend/.env.example` — thêm `REDIS_URL=redis://localhost:56379/1`
 - `backend/src/config/index.ts` — thêm `redisUrl`
 - `app/src/constants/config.ts` — API_BASE_URL dev → `https://filme-highways-asset-rendering.trycloudflare.com/api`
-- `URLS.md` — cập nhật cấu trúc 4 container + URL mới
+- `URLS.md` — cập nhật cấu trúc container + URL mới
 
-## Trạng thái (2026-08-03)
+## Trạng thái (2026-08-03 → cập nhật 2026-08-05)
 
-- 4 container chạy: api 4000, admin 5050 (nginx), db 5432, redis 6379 (PONG)
-- Verify: `api/health` 200, `api/admin/` 404 (đã tách), `admin/` + `admin/admin/` 200, `admin/api/categories` 200 (nginx proxy), `uploads` proxy 404 từ api
-- Cloudflare tunnel (PID 95624) trỏ **admin 5050**: `https://filme-highways-asset-rendering.trycloudflare.com` — 1 URL dùng cho cả web admin lẫn API
-- Expo: `--tunnel --port 8082` → `exp://f5mi5k0-anonymous-8082.exp.direct`
-- Port 5000 bị macOS AirPlay chiếm → admin dùng 5050
+- Container: api **3100**, admin **3101**; DB/Redis shared NOXH (`55432` / `56379`)
+- Verify: `api/health` 200, nginx proxy `/api` qua admin 3101
+- Cloudflare tunnel nên trỏ **admin 3101**
+- Expo: `--tunnel --port 8082`
+- (Lịch sử: từng dùng 4000/5050; đã chuyển sang dải 3100–31xx để tránh conflict NOXH)
 
 # Session: 2026-08-03
 

@@ -20,6 +20,6 @@ COPY seeds ./seeds
 
 RUN mkdir -p /app/uploads/videos
 
-EXPOSE 4000
+EXPOSE 3100
 
 CMD ["node", "dist/index.js"]

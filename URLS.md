@@ -1,17 +1,30 @@
 # URL hiện tại (Cloudflare Tunnel)
 
-Cập nhật: 2026-08-04
+Cập nhật: 2026-08-05
 
-## Cấu trúc Docker (4 container)
+## Cấu trúc Docker
 
 | Container | Port host | Vai trò |
 |---|---|---|
-| `haisanhanoi-api` | 4000 | API Express (thuần API + /uploads) |
-| `haisanhanoi-admin` | 5050 | Nginx: web admin + proxy `/api`, `/uploads` → api |
-| `haisanhanoi-db` | 5432 | PostgreSQL 16 |
-| `haisanhanoi-redis` | 6379 | Redis 7 |
+| `haisanhanoi-api` | 3100 | API Express (thuần API + /uploads) |
+| `haisanhanoi-admin` | 3101 | Nginx: web admin + proxy `/api`, `/uploads` → api |
 
-Cloudflare tunnel trỏ vào **admin (port 5050)** — nginx proxy `/api` & `/uploads` sang api, nên 1 URL dùng được cho cả web admin lẫn API.
+**Dùng chung với NOXH** (không còn `haisanhanoi-db` / `haisanhanoi-redis`):
+
+| Container (NOXH) | Port host | Vai trò cho HSHN |
+|---|---|---|
+| `noxh-postgres` | 55432 | PostgreSQL — database riêng `haisanhanoi` |
+| `noxh-redis` | 56379 | Redis — logical DB index `1` (NOXH dùng `0`) |
+
+API join network Docker `noxh_default` để gọi `noxh-postgres` / `noxh-redis` nội bộ.
+
+Khởi tạo DB lần đầu (từ `backend/`):
+
+```bash
+./scripts/init-shared-db.sh
+```
+
+Cloudflare tunnel trỏ vào **admin (port 3101)** — nginx proxy `/api` & `/uploads` sang api, nên 1 URL dùng được cho cả web admin lẫn API.
 
 ## Web Admin + API
 
@@ -31,3 +44,4 @@ Cloudflare tunnel trỏ vào **admin (port 5050)** — nginx proxy `/api` & `/up
 - URL Cloudflare/Expo tunnel là **ngẫu nhiên**, thay đổi mỗi lần restart tunnel.
 - `API_BASE_URL` trong `app/src/constants/config.ts` đã trỏ tới URL Cloudflare API ở trên.
 - Log tunnel: `/tmp/hshn_tunnel.log` (PID 12023); log Expo: `/tmp/hshn_expo.log` (PID 28726).
+- Port app HSHN (`3100` API, `3101` admin) và NOXH (`3000–3003`, `8081`, `55432`, `56379`) không trùng nhau.

@@ -2,12 +2,12 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || '4000', 10),
+  port: parseInt(process.env.PORT || '3100', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || '*',
   db: {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
+    port: parseInt(process.env.DB_PORT || '55432', 10),
     name: process.env.DB_NAME || 'haisanhanoi',
     user: process.env.DB_USER || 'hshn_user',
     pass: process.env.DB_PASS || 'hshn_pass',
@@ -18,7 +18,7 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   hardShipTimeoutMin: parseInt(process.env.HARD_SHIP_TIMEOUT_MIN || '10', 10),
-  redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+  redisUrl: process.env.REDIS_URL || 'redis://localhost:56379/1',
   r2: {
     enabled: process.env.R2_ENABLED === 'true',
     endpoint: process.env.R2_ENDPOINT || '',
