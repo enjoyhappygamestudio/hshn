@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Hải Sản Hà Nội",
+    "slug": "hai-san-ha-noi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#078C86"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.mehseafood.haisanhanoi",
+      "buildNumber": "1",
+      "config": {
+        "googleMapsApiKey": "YOUR_API_KEY"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần vị trí của bạn để hiển thị cửa hàng gần nhất và theo dõi giao hàng.",
+        "NSCameraUsageDescription": "Ứng dụng cần camera để chụp ảnh đại diện."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#078C86"
+      },
+      "package": "com.mehseafood.haisanhanoi",
+      "versionCode": 1,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_API_KEY"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      "expo-location",
+      "expo-notifications"
+    ]
+  }
+}

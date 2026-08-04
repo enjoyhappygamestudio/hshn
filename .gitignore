@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Expo / Metro
+.expo/
+
+# Env & secrets
+.env
+.env.local
+.env.production
+
+# Runtime data
+uploads/
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

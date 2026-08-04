@@ -1,0 +1,124 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: haisanhanoi-api
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=haisanhanoi
+      - DB_USER=hshn_user
+      - DB_PASS=hshn_pass
+      - JWT_SECRET=hshn-jwt-secret-change-in-production
+      - JWT_EXPIRES_IN=7d
+      - HARD_SHIP_TIMEOUT_MIN=${HARD_SHIP_TIMEOUT_MIN:-10}
+      - REDIS_URL=redis://redis:6379
+      - R2_ENABLED=${R2_ENABLED:-false}
+      - R2_ENDPOINT=${R2_ENDPOINT:-}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_MEDIA_BUCKET=${R2_MEDIA_BUCKET:-hsb-media}
+      - R2_DOCUMENTS_BUCKET=${R2_DOCUMENTS_BUCKET:-hsb-documents}
+      - R2_BACKUPS_BUCKET=${R2_BACKUPS_BUCKET:-hsb-backups}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL:-}
+      - BACKUP_ENABLED=${BACKUP_ENABLED:-false}
+      - BACKUP_HOUR_UTC=${BACKUP_HOUR_UTC:-3}
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-30}
+      - GHN_ENABLED=${GHN_ENABLED:-false}
+      - GHN_API_URL=${GHN_API_URL:-https://online-gateway.ghn.vn/shipping}
+      - GHN_TOKEN=${GHN_TOKEN:-}
+      - GHTK_ENABLED=${GHTK_ENABLED:-false}
+      - GHTK_API_URL=${GHTK_API_URL:-https://services.ghtk.vn}
+      - GHTK_TOKEN=${GHTK_TOKEN:-}
+      - VIETTEL_ENABLED=${VIETTEL_ENABLED:-false}
+      - VIETTEL_API_URL=${VIETTEL_API_URL:-https://partner.viettelpost.vn/v2}
+      - VIETTEL_TOKEN=${VIETTEL_TOKEN:-}
+      - AHAMOVE_ENABLED=${AHAMOVE_ENABLED:-false}
+      - AHAMOVE_API_URL=${AHAMOVE_API_URL:-https://partner-api.ahamove.com}
+      - AHAMOVE_TOKEN=${AHAMOVE_TOKEN:-}
+      - AHAMOVE_MOBILE=${AHAMOVE_MOBILE:-}
+      - AHAMOVE_SHOP_NAME=${AHAMOVE_SHOP_NAME:-MEH Seafood}
+      - AHAMOVE_SHOP_PHONE=${AHAMOVE_SHOP_PHONE:-}
+      - AHAMOVE_SHOP_ADDRESS=${AHAMOVE_SHOP_ADDRESS:-}
+      - GRAB_ENABLED=${GRAB_ENABLED:-false}
+      - GRAB_API_URL=${GRAB_API_URL:-https://api.grab.com}
+      - GRAB_TOKEN=${GRAB_TOKEN:-}
+      - BEE_ENABLED=${BEE_ENABLED:-false}
+      - BEE_API_URL=${BEE_API_URL:-https://api.be.com.vn}
+      - BEE_TOKEN=${BEE_TOKEN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - api_logs:/app/logs
+      - api_uploads:/app/uploads
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    container_name: haisanhanoi-admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: haisanhanoi-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=haisanhanoi
+      - POSTGRES_USER=hshn_user
+      - POSTGRES_PASSWORD=hshn_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
+      - ./migrations/002_admin_users.sql:/docker-entrypoint-initdb.d/002_admin_users.sql
+      - ./seeds/seed.sql:/docker-entrypoint-initdb.d/003_seed.sql
+      - ./migrations/004_chat_video_shipping.sql:/docker-entrypoint-initdb.d/004_chat_video_shipping.sql
+      - ./migrations/006_video_comments.sql:/docker-entrypoint-initdb.d/006_video_comments.sql
+      - ./migrations/007_ahamove_shipping.sql:/docker-entrypoint-initdb.d/007_ahamove_shipping.sql
+      - ./migrations/009_product_weight.sql:/docker-entrypoint-initdb.d/009_product_weight.sql
+      - ./migrations/010_hard_to_ship.sql:/docker-entrypoint-initdb.d/010_hard_to_ship.sql
+      - ./migrations/011_order_status_7.sql:/docker-entrypoint-initdb.d/011_order_status_7.sql
+      - ./migrations/012_categories.sql:/docker-entrypoint-initdb.d/012_categories.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hshn_user -d haisanhanoi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: haisanhanoi-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  api_logs:
+  api_uploads:
+  redis_data:

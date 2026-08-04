@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+*.apk
+*.aab
+*.hprof
+.env
+ios/Pods/
+android/.gradle/
+android/app/build/
+*.tsbuildinfo
+.DS_Store
