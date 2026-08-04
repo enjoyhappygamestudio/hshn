@@ -49,25 +49,24 @@ if [[ "$MIGRATE_FROM_OLD" == "1" ]] && docker ps --format '{{.Names}}' | grep -q
   rm -f "$TMP_DUMP"
   echo "==> Migrate xong."
 else
-  echo "==> Không migrate từ DB cũ — chạy migrations SQL (schema trống)."
-  for f in \
-    "$ROOT/migrations/001_initial.sql" \
-    "$ROOT/migrations/002_admin_users.sql" \
-    "$ROOT/seeds/seed.sql" \
-    "$ROOT/migrations/004_chat_video_shipping.sql" \
-    "$ROOT/migrations/006_video_comments.sql" \
-    "$ROOT/migrations/007_ahamove_shipping.sql" \
-    "$ROOT/migrations/009_product_weight.sql" \
-    "$ROOT/migrations/010_hard_to_ship.sql" \
-    "$ROOT/migrations/011_order_status_7.sql" \
-    "$ROOT/migrations/012_categories.sql"
-  do
+  echo "==> Không migrate từ DB cũ — chạy toàn bộ migrations rồi seed."
+  # Schema trước (theo số thứ tự), seed sau cùng — seed cần cột từ 009_product_weight, v.v.
+  shopt -s nullglob
+  files=( "$ROOT"/migrations/*.sql )
+  IFS=$'\n' files=( $(printf '%s\n' "${files[@]}" | sort) )
+  files+=( "$ROOT/seeds/seed.sql" )
+  for f in "${files[@]}"; do
     if [[ -f "$f" ]]; then
       echo "    apply $(basename "$f")"
-      docker exec -i "$NOXH_PG_CONTAINER" psql -U "$HSHN_USER" -d "$HSHN_DB" < "$f" >/dev/null
+      docker exec -i "$NOXH_PG_CONTAINER" \
+        psql -v ON_ERROR_STOP=1 -U "$HSHN_USER" -d "$HSHN_DB" < "$f" >/dev/null
     fi
   done
 fi
 
 echo "==> Done. Kết nối Docker: postgresql://${HSHN_USER}:***@noxh-postgres:5432/${HSHN_DB}"
 echo "    Host (apps ngoài Docker): localhost:55432"
+echo ""
+echo "    Reset sạch (VPS, khi seed/migration lỗi giữa chừng):"
+echo "      docker exec -i ${NOXH_PG_CONTAINER} psql -U ${NOXH_SUPERUSER} -d postgres -c \"DROP DATABASE IF EXISTS ${HSHN_DB} WITH (FORCE);\""
+echo "      MIGRATE_FROM_OLD=0 ./scripts/init-shared-db.sh"
