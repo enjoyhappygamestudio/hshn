@@ -8,8 +8,13 @@ const MEDIA_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
  */
 export function mediaUrl(path?: string | null): string | null {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return encodeURI(decodeURI(path));
-  return encodeURI(decodeURI(MEDIA_ORIGIN + path));
+  if (/^data:/i.test(path)) return path;
+  const absolute = /^https?:\/\//i.test(path) ? path : MEDIA_ORIGIN + path;
+  try {
+    return encodeURI(decodeURI(absolute));
+  } catch {
+    return absolute;
+  }
 }
 
 export { MEDIA_ORIGIN };

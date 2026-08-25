@@ -212,6 +212,11 @@ tr:hover td { background: #F8FAFA; }
   background: var(--primary); color: white; padding: 1px 6px; border-radius: 4px;
 }
 
+.list-thumb {
+  width: 56px; height: 56px; object-fit: cover; display: block;
+  border-radius: var(--radius); border: 1px solid var(--border); background: #FAFBFC;
+}
+
 /* ─── VARIANTS TABLE ─── */
 .variant-table { width: 100%; border-collapse: collapse; }
 .variant-table th { background: #F8FAFA; }

@@ -11,6 +11,7 @@ import {
 import { Product } from '../types';
 import { colors, radii, shadows, fonts } from '../constants/theme';
 import { formatMoney } from '../utils/format';
+import { mediaUrl } from '../utils/media';
 
 interface ProductCardProps {
   product: Product;
@@ -27,6 +28,8 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(
       product.oldPrice && !product.isOutOfStock
         ? Math.round((1 - product.price / product.oldPrice) * 100)
         : null;
+
+    const imageUri = mediaUrl(product.images?.[0]);
 
     const handlePress = useCallback(() => onPress(product.id), [product.id, onPress]);
     const handleAdd = useCallback(
@@ -51,8 +54,8 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(
               <Text style={styles.saleText}>-{salePct}%</Text>
             </View>
           )}
-          {product.images && product.images[0] ? (
-            <Image source={{ uri: product.images[0] }} style={styles.productImage} />
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.productImage} />
           ) : (
             <Text style={styles.emoji}>{product.emoji}</Text>
           )}

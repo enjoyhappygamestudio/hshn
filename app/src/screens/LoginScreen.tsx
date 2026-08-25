@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts, commonStyles } from '../constants/theme';
 import { useAuthStore } from '../stores/authStore';
-import { sendOtp, verifyOtp } from '../services/api';
 
 export const LoginScreen: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -25,9 +24,6 @@ export const LoginScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [sendingOtp, setSendingOtp] = useState(false);
 
   const { login, register, isLoading } = useAuthStore();
 
@@ -55,24 +51,12 @@ export const LoginScreen: React.FC = () => {
       if (mode === 'login') {
         await login(phone.trim(), password);
       } else {
-        if (!otpStep) {
-          setSendingOtp(true);
-          await sendOtp(phone.trim());
-          setSendingOtp(false);
-          setOtpStep(true);
-        } else {
-          if (!otpCode.trim()) {
-            Alert.alert('Lỗi', 'Vui lòng nhập mã xác nhận');
-            return;
-          }
-          await verifyOtp(phone.trim(), otpCode.trim());
-          await register(name.trim(), phone.trim(), password, email.trim() || undefined);
-        }
+        await register(name.trim(), phone.trim(), password, email.trim() || undefined);
       }
     } catch (err: any) {
       Alert.alert('Lỗi', err.message || 'Có lỗi xảy ra');
     }
-  }, [mode, name, email, phone, password, confirmPassword, otpStep, otpCode, login, register]);
+  }, [mode, name, email, phone, password, confirmPassword, login, register]);
 
   return (
     <SafeAreaView style={commonStyles.screen}>
@@ -177,23 +161,6 @@ export const LoginScreen: React.FC = () => {
                 </View>
               )}
 
-              {mode === 'register' && otpStep && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>Mã xác nhận</Text>
-                  <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 8 }}>
-                    Mã OTP đã được gửi đến số {phone}
-                  </Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="000000"
-                    value={otpCode}
-                    onChangeText={setOtpCode}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                  />
-                </View>
-              )}
-
               {mode === 'login' && (
                 <TouchableOpacity
                   onPress={() => (useNavigation() as any).navigate('ForgotPassword')}
@@ -214,7 +181,7 @@ export const LoginScreen: React.FC = () => {
                   <ActivityIndicator color={colors.white} />
                 ) : (
                   <Text style={styles.submitText}>
-                    {mode === 'login' ? 'Đăng nhập' : otpStep ? 'Xác nhận & Đăng ký' : 'Đăng ký'}
+                    {mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
                   </Text>
                 )}
               </TouchableOpacity>

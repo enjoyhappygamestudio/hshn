@@ -483,6 +483,7 @@ async function loadProducts() {
       <table>
         <thead><tr>
           <th style="width:36px"><input type="checkbox" id="select-all"></th>
+          <th style="width:76px">Ảnh</th>
           <th>Sản phẩm</th>
           <th>Danh mục</th>
           <th>Giá</th>
@@ -494,6 +495,7 @@ async function loadProducts() {
           ${products.map(p => `
             <tr>
               <td><input type="checkbox" class="product-check" value="${p.id}"></td>
+              <td>${productThumb(p)}</td>
               <td><strong>${esc(p.name)}</strong></td>
               <td>${esc(p.category_name || '')}</td>
               <td class="num">${fmt(p.price)}₫</td>
@@ -524,6 +526,17 @@ async function loadProducts() {
     } else {
       pg.innerHTML = `<span style="font-size:12px;color:var(--text-secondary)">${pag.total} sản phẩm</span>`;
     }
+
+    // Ảnh 404 (file đã mất) trông giống ảnh chưa tải xong, nên đánh dấu rõ ràng
+    qsa('.list-thumb').forEach(img => {
+      img.addEventListener('error', () => {
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-orange';
+        badge.title = `Không tải được ảnh: ${img.getAttribute('src')}`;
+        badge.textContent = 'Ảnh lỗi';
+        img.replaceWith(badge);
+      });
+    });
 
     // Select all
     $('select-all').addEventListener('change', function() {
@@ -579,6 +592,12 @@ async function deleteProduct(id, name) {
   } catch (e) {
     toast(e.message, 'error');
   }
+}
+
+function productThumb(p) {
+  const url = (p.images || [])[0];
+  if (!url) return '<span class="badge badge-red" title="Sản phẩm chưa có ảnh">Chưa có ảnh</span>';
+  return `<img class="list-thumb" src="${esc(url)}" alt="" loading="lazy" title="${esc(url)}">`;
 }
 
 function productStatusBadge(p) {
