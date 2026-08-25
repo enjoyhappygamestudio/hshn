@@ -16,6 +16,7 @@ import shippingRoutes from './routes/shipping';
 import notificationRoutes from './routes/notifications';
 import adminRoutes from './routes/admin';
 import invoiceRoutes from './routes/invoice';
+import { supportPublicRouter, supportAdminRouter } from './routes/support';
 import { config } from './config';
 import { query } from './utils/db';
 import { success, error } from './utils/response';
@@ -188,6 +189,8 @@ app.use('/api/shipping', shippingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/invoice', invoiceRoutes);
+app.use('/api/admin/support', supportAdminRouter);
+app.use('/api/support', supportPublicRouter);
 
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

@@ -126,6 +126,7 @@ function render() {
         <a href="#" data-page="videos" class="${state.page === 'videos' ? 'active' : ''}"><span class="icon">🎬</span> Video sản phẩm</a>
         <div class="nav-section-label">Cấu hình</div>
         <a href="#" data-page="shipping-partners" class="${state.page === 'shipping-partners' ? 'active' : ''}"><span class="icon">🚚</span> Đối tác vận chuyển</a>
+        <a href="#" data-page="support-settings" class="${state.page === 'support-settings' ? 'active' : ''}"><span class="icon">☎️</span> Hỗ trợ khách hàng</a>
         <div class="nav-section-label">Hóa đơn VAT</div>
         <a href="#" data-page="invoice-settings" class="${state.page === 'invoice-settings' ? 'active' : ''}"><span class="icon">⚙️</span> Cấu hình</a>
         <a href="#" data-page="invoice-rules" class="${state.page === 'invoice-rules' ? 'active' : ''}"><span class="icon">📋</span> Quy tắc xuất</a>
@@ -177,6 +178,7 @@ function render() {
     case 'inbox': renderInbox(content); break;
     case 'videos': renderVideos(content); break;
     case 'shipping-partners': renderShippingPartners(content); break;
+    case 'support-settings': renderSupportSettings(content); break;
     case 'invoice-settings': renderInvoiceSettings(content); break;
     case 'invoice-rules': renderInvoiceRules(content); break;
     case 'invoices': renderInvoices(content); break;
@@ -314,7 +316,7 @@ function can(perm) {
   return state.admin.role !== 'inventory_staff';
 }
 function pageTitle() {
-  const t = { dashboard:'Tổng quan', products:'Sản phẩm', 'product-edit': state.params?.id ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm', orders:'Đơn hàng', 'order-detail':'Chi tiết đơn hàng', customers:'Khách hàng', vouchers:'Khuyến mãi', inbox:'Hộp thư hỗ trợ', videos:'Video sản phẩm', 'shipping-partners':'Đối tác vận chuyển', 'invoice-settings':'Cấu hình hóa đơn VAT', 'invoice-rules':'Quy tắc xuất hóa đơn', invoices:'Lịch sử hóa đơn', 'invoice-detail':'Chi tiết hóa đơn' }[state.page];
+  const t = { dashboard:'Tổng quan', products:'Sản phẩm', 'product-edit': state.params?.id ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm', orders:'Đơn hàng', 'order-detail':'Chi tiết đơn hàng', customers:'Khách hàng', vouchers:'Khuyến mãi', inbox:'Hộp thư hỗ trợ', videos:'Video sản phẩm', 'shipping-partners':'Đối tác vận chuyển', 'support-settings':'Hỗ trợ khách hàng', 'invoice-settings':'Cấu hình hóa đơn VAT', 'invoice-rules':'Quy tắc xuất hóa đơn', invoices:'Lịch sử hóa đơn', 'invoice-detail':'Chi tiết hóa đơn' }[state.page];
   return t || 'Admin';
 }
 
@@ -2738,6 +2740,189 @@ function showEditVideoDialog(videoId, productId) {
       toast(e.message, 'error');
     }
   })();
+}
+
+// ─── SUPPORT SETTINGS ───
+async function renderSupportSettings(el) {
+  el.innerHTML = '<p>Đang tải...</p>';
+  try {
+    const res = await api('GET', '/admin/support');
+    const cfg = res.data?.settings || {};
+    const faqs = res.data?.faqs || [];
+    window.__supportFaqs = faqs;
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h3>Tổng đài & liên hệ</h3></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Số tổng đài <span style="color:var(--danger)">*</span></label>
+              <input type="text" id="sup-hotline" value="${esc(cfg.hotline_display || '')}" placeholder="1900 123 456">
+            </div>
+            <div class="form-group">
+              <label>Số để gọi (tel)</label>
+              <input type="text" id="sup-hotline-tel" value="${esc(cfg.hotline_tel || '')}" placeholder="1900123456">
+              <div class="hint">Để trống thì hệ thống tự bỏ khoảng trắng từ số tổng đài</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Giờ làm việc</label>
+            <input type="text" id="sup-hours" value="${esc(cfg.hours || '')}" placeholder="7:00 - 22:00 • Tất cả các ngày">
+          </div>
+          <div class="form-group">
+            <label>Link Chat Zalo</label>
+            <input type="url" id="sup-zalo" value="${esc(cfg.zalo_url || '')}" placeholder="https://zalo.me/1900123456">
+          </div>
+          <div class="form-group">
+            <label>Email <span style="color:var(--danger)">*</span></label>
+            <input type="email" id="sup-email" value="${esc(cfg.email || '')}" placeholder="support@haisanhanoi.vn">
+          </div>
+          <div class="form-group">
+            <label>Địa chỉ văn phòng <span style="color:var(--danger)">*</span></label>
+            <textarea id="sup-office" rows="2">${esc(cfg.office_address || '')}</textarea>
+          </div>
+          <div>
+            <button class="btn btn-primary" id="sup-save-contact">Lưu thông tin liên hệ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Câu hỏi thường gặp</h3>
+          <button class="btn btn-sm btn-primary" id="sup-add-faq">+ Thêm câu hỏi</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:48px">#</th>
+              <th>Câu hỏi</th>
+              <th>Câu trả lời</th>
+              <th>Trạng thái</th>
+              <th style="width:120px">Hành động</th>
+            </tr></thead>
+            <tbody>
+              ${faqs.length === 0
+                ? '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-secondary)">Chưa có câu hỏi nào</td></tr>'
+                : faqs.map((f, i) => `
+              <tr>
+                <td class="num">${f.sort_order ?? i + 1}</td>
+                <td><strong>${esc(f.question)}</strong></td>
+                <td style="max-width:360px;color:var(--text-secondary);font-size:13px">${esc(f.answer)}</td>
+                <td>${f.active ? '<span class="badge badge-green">Hiện trên app</span>' : '<span class="badge badge-gray">Ẩn</span>'}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline" onclick="showFaqDialogById('${f.id}')">✏️</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteFaq('${f.id}')">🗑️</button>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    $('sup-save-contact')?.addEventListener('click', async () => {
+      const hotline_display = $('sup-hotline')?.value?.trim();
+      const email = $('sup-email')?.value?.trim();
+      const office_address = $('sup-office')?.value?.trim();
+      if (!hotline_display || !email || !office_address) {
+        toast('Vui lòng nhập hotline, email và địa chỉ văn phòng', 'error');
+        return;
+      }
+      try {
+        await api('PUT', '/admin/support', {
+          hotline_display,
+          hotline_tel: $('sup-hotline-tel')?.value?.trim() || '',
+          hours: $('sup-hours')?.value?.trim() || '',
+          zalo_url: $('sup-zalo')?.value?.trim() || '',
+          email,
+          office_address,
+        });
+        toast('Đã lưu thông tin liên hệ');
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    });
+    $('sup-add-faq')?.addEventListener('click', () => showFaqDialog());
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger)">Lỗi: ${e.message}</p>`;
+  }
+}
+
+function showFaqDialogById(id) {
+  const faq = (window.__supportFaqs || []).find((f) => f.id === id);
+  showFaqDialog(faq);
+}
+
+function showFaqDialog(faq) {
+  const f = faq || { question: '', answer: '', sort_order: 0, active: true };
+  const overlay = document.createElement('div'); overlay.className = 'dialog-overlay';
+  overlay.innerHTML = `
+    <div class="dialog" style="width:520px">
+      <h3 style="font-size:15px">${faq ? 'Sửa câu hỏi' : 'Thêm câu hỏi'}</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+        <div class="form-group">
+          <label style="font-size:12px">Câu hỏi <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="dlg-faq-q" value="${esc(f.question)}" placeholder="VD: Làm sao để đặt hàng?">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px">Câu trả lời <span style="color:var(--danger)">*</span></label>
+          <textarea id="dlg-faq-a" rows="4" placeholder="Nhập nội dung trả lời...">${esc(f.answer)}</textarea>
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:1">
+            <label style="font-size:12px">Thứ tự</label>
+            <input type="number" id="dlg-faq-order" value="${f.sort_order || 0}" min="0">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label style="font-size:12px">Hiển thị trên app</label>
+            <select id="dlg-faq-active">
+              <option value="true" ${f.active !== false ? 'selected' : ''}>Hiện</option>
+              <option value="false" ${f.active === false ? 'selected' : ''}>Ẩn</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-cancel" id="dlg-cancel">Hủy</button>
+        <button class="btn btn-primary" id="dlg-save">Lưu</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#dlg-cancel')?.addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#dlg-save')?.addEventListener('click', async () => {
+    const question = $('dlg-faq-q')?.value?.trim();
+    const answer = $('dlg-faq-a')?.value?.trim();
+    if (!question || !answer) { toast('Vui lòng nhập câu hỏi và câu trả lời', 'error'); return; }
+    const payload = {
+      question,
+      answer,
+      sort_order: parseInt($('dlg-faq-order')?.value, 10) || 0,
+      active: $('dlg-faq-active')?.value === 'true',
+    };
+    try {
+      if (faq?.id) await api('PUT', `/admin/support/faqs/${faq.id}`, payload);
+      else await api('POST', '/admin/support/faqs', payload);
+      overlay.remove();
+      toast(faq?.id ? 'Đã cập nhật câu hỏi' : 'Đã thêm câu hỏi');
+      renderSupportSettings($('page-content'));
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+}
+
+async function deleteFaq(id) {
+  if (!confirm('Xóa câu hỏi này?')) return;
+  try {
+    await api('DELETE', `/admin/support/faqs/${id}`);
+    toast('Đã xóa câu hỏi');
+    renderSupportSettings($('page-content'));
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 // ─── SHIPPING PARTNERS ───

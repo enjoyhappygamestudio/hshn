@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,35 +8,79 @@ import {
   ScrollView,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, commonStyles } from '../constants/theme';
 import { BackButton } from '../components/BackButton';
+import { fetchSupport } from '../services/api';
 
 interface SupportScreenProps {
   navigation: any;
 }
 
-const FAQ = [
-  { q: 'Làm sao để đặt hàng?', a: 'Chọn sản phẩm, thêm vào giỏ hàng, chọn phương thức giao hàng & thanh toán, xác nhận đơn hàng.' },
-  { q: 'Thời gian giao hàng bao lâu?', a: 'Nội thành Hà Nội: 1-3 giờ (hỏa tốc) hoặc hẹn giờ. Ngoại thành: 3-6 giờ.' },
-  { q: 'Có được kiểm tra hàng không?', a: 'Có. Bạn được kiểm tra số lượng, chủng loại trước khi thanh toán.' },
-  { q: 'Chính sách đổi trả?', a: 'Hải sản tươi sống không hỗ trợ đổi trả. Nếu sản phẩm không đạt chất lượng, vui lòng liên hệ hotline trong vòng 2 giờ.' },
-  { q: 'Làm sao để hủy đơn?', a: 'Vào mục Đơn mua > chọn đơn > Hủy đơn. Chỉ hủy được khi đơn chưa vào bếp.' },
-];
+const FALLBACK = {
+  hotline_display: '1900 123 456',
+  hotline_tel: '1900123456',
+  hours: '7:00 - 22:00 • Tất cả các ngày',
+  zalo_url: 'https://zalo.me/1900123456',
+  email: 'support@haisanhanoi.vn',
+  office_address: 'Số 12, ngõ 88 Trần Duy Hưng, Cầu Giấy, Hà Nội',
+  faqs: [
+    { id: '1', question: 'Làm sao để đặt hàng?', answer: 'Chọn sản phẩm, thêm vào giỏ hàng, chọn phương thức giao hàng & thanh toán, xác nhận đơn hàng.' },
+    { id: '2', question: 'Thời gian giao hàng bao lâu?', answer: 'Nội thành Hà Nội: 1-3 giờ (hỏa tốc) hoặc hẹn giờ. Ngoại thành: 3-6 giờ.' },
+    { id: '3', question: 'Có được kiểm tra hàng không?', answer: 'Có. Bạn được kiểm tra số lượng, chủng loại trước khi thanh toán.' },
+    { id: '4', question: 'Chính sách đổi trả?', answer: 'Hải sản tươi sống không hỗ trợ đổi trả. Nếu sản phẩm không đạt chất lượng, vui lòng liên hệ hotline trong vòng 2 giờ.' },
+    { id: '5', question: 'Làm sao để hủy đơn?', answer: 'Vào mục Đơn mua > chọn đơn > Hủy đơn. Chỉ hủy được khi đơn chưa vào bếp.' },
+  ],
+};
 
 export const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(FALLBACK);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetchSupport();
+      setData({
+        hotline_display: res.hotline_display || FALLBACK.hotline_display,
+        hotline_tel: res.hotline_tel || FALLBACK.hotline_tel,
+        hours: res.hours || FALLBACK.hours,
+        zalo_url: res.zalo_url || FALLBACK.zalo_url,
+        email: res.email || FALLBACK.email,
+        office_address: res.office_address || FALLBACK.office_address,
+        faqs: (res.faqs || []).map((f) => ({
+          id: f.id,
+          question: f.question,
+          answer: f.answer,
+        })),
+      });
+    } catch {
+      setData(FALLBACK);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const callHotline = () => {
-    Linking.openURL('tel:1900123456').catch(() =>
-      Alert.alert('Không thể gọi', 'Vui lòng gọi 1900 123 456'),
+    const tel = (data.hotline_tel || data.hotline_display).replace(/[^\d+]/g, '');
+    Linking.openURL(`tel:${tel}`).catch(() =>
+      Alert.alert('Không thể gọi', `Vui lòng gọi ${data.hotline_display}`),
     );
   };
 
   const openZalo = () => {
-    Linking.openURL('https://zalo.me/1900123456').catch(() =>
+    Linking.openURL(data.zalo_url).catch(() =>
       Alert.alert('Lỗi', 'Không thể mở Zalo'),
+    );
+  };
+
+  const openEmail = () => {
+    Linking.openURL(`mailto:${data.email}`).catch(() =>
+      Alert.alert('Lỗi', `Vui lòng gửi email tới ${data.email}`),
     );
   };
 
@@ -49,11 +93,16 @@ export const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
         <View style={{ width: 60 }} />
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.contactCard}>
           <Text style={styles.contactTitle}>📞 Tổng đài hỗ trợ</Text>
-          <Text style={styles.contactPhone}>1900 123 456</Text>
-          <Text style={styles.contactHours}>7:00 - 22:00 • Tất cả các ngày</Text>
+          <Text style={styles.contactPhone}>{data.hotline_display}</Text>
+          <Text style={styles.contactHours}>{data.hours}</Text>
           <View style={styles.contactRow}>
             <TouchableOpacity style={styles.contactBtn} onPress={callHotline}>
               <Text style={styles.contactBtnText}>📞 Gọi ngay</Text>
@@ -64,35 +113,38 @@ export const SupportScreen: React.FC<SupportScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <TouchableOpacity style={styles.section} onPress={openEmail} activeOpacity={0.8}>
           <Text style={styles.sectionTitle}>📧 Email</Text>
-          <Text style={styles.sectionText}>support@haisanhanoi.vn</Text>
-        </View>
+          <Text style={styles.sectionText}>{data.email}</Text>
+        </TouchableOpacity>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📍 Văn phòng</Text>
-          <Text style={styles.sectionText}>Số 12, ngõ 88 Trần Duy Hưng, Cầu Giấy, Hà Nội</Text>
+          <Text style={styles.sectionText}>{data.office_address}</Text>
         </View>
 
-        <Text style={styles.faqTitle}>❓ Câu hỏi thường gặp</Text>
+        {data.faqs.length > 0 && (
+          <Text style={styles.faqTitle}>❓ Câu hỏi thường gặp</Text>
+        )}
 
-        {FAQ.map((item, i) => (
+        {data.faqs.map((item) => (
           <TouchableOpacity
-            key={i}
-            style={[styles.faqItem, expanded === i && styles.faqItemOpen]}
-            onPress={() => setExpanded(expanded === i ? null : i)}
+            key={item.id}
+            style={[styles.faqItem, expanded === item.id && styles.faqItemOpen]}
+            onPress={() => setExpanded(expanded === item.id ? null : item.id)}
             activeOpacity={0.7}
           >
             <View style={styles.faqHead}>
-              <Text style={styles.faqQ}>{item.q}</Text>
-              <Text style={styles.faqChev}>{expanded === i ? '▲' : '▼'}</Text>
+              <Text style={styles.faqQ}>{item.question}</Text>
+              <Text style={styles.faqChev}>{expanded === item.id ? '▲' : '▼'}</Text>
             </View>
-            {expanded === i && <Text style={styles.faqA}>{item.a}</Text>}
+            {expanded === item.id && <Text style={styles.faqA}>{item.answer}</Text>}
           </TouchableOpacity>
         ))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 };

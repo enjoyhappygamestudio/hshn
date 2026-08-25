@@ -309,3 +309,16 @@ export async function getVideoLikeStatus(videoId: string, customerId?: string): 
   const res: any = await api.get(`/products/videos/${videoId}/like`, { params: { customer_id: customerId } });
   return res.data;
 }
+
+export async function fetchSupport(): Promise<{
+  hotline_display: string;
+  hotline_tel: string;
+  hours: string;
+  zalo_url: string;
+  email: string;
+  office_address: string;
+  faqs: { id: string; question: string; answer: string }[];
+}> {
+  const res: any = await api.get('/support');
+  return res.data;
+}
