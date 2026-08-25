@@ -32,6 +32,13 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       return res.status(400).json(error('Vui lòng chọn phương thức thanh toán'));
     }
 
+    // Token chỉ được verify bằng chữ ký, nên một token cũ (ký bởi môi trường
+    // khác dùng chung JWT_SECRET) vẫn hợp lệ dù customer không có trong DB này.
+    const customerExists = await query('SELECT 1 FROM customers WHERE id = $1', [req.customerId]);
+    if (customerExists.rows.length === 0) {
+      return res.status(401).json(error('Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại.'));
+    }
+
     // Enrich items with product images
     const productIds = items.map((i: any) => i.product_id).filter(Boolean);
     let imageMap: Record<string, string> = {};
@@ -81,7 +88,8 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
     res.status(201).json(success(order));
   } catch (err: any) {
-    res.status(500).json(error(err.message));
+    console.error('[orders] create failed:', err);
+    res.status(500).json(error('Không tạo được đơn hàng. Vui lòng thử lại.'));
   }
 });
 
