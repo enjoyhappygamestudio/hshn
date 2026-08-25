@@ -26,8 +26,9 @@ export async function createShippingForOrder(orderId: string): Promise<void> {
     weight: i.weight || 1,
     price: i.price || 0,
   }));
-  const goodsValue = Math.max(0, (order.subtotal || 0) - (order.discount || 0));
-  const cod = order.payment_method === 'cod' ? goodsValue : 0;
+  // COD = số tiền khách trả tận nơi = order.total (đã gồm phí ship, trừ voucher hàng & voucher freeship)
+  const amountDue = Math.max(0, Number(order.total) || 0);
+  const cod = order.payment_method === 'cod' ? amountDue : 0;
   const orderTime = computeOrderTime(order);
 
   const buildRequest = (codAmount: number) => ({

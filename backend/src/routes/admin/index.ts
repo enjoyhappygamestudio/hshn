@@ -653,18 +653,37 @@ const SOLD_ITEMS_SQL = `
   WHERE o.status <> 'cancelled'
 `;
 
-router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
+router.get('/analytics', authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
+    const fromRaw = String(req.query.from || '').trim();
+    const toRaw = String(req.query.to || '').trim();
+
     const bounds = await query(`
       SELECT
         (date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS week_start,
         (date_trunc('month', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS month_start,
+        COALESCE(
+          NULLIF($1, '')::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh',
+          date_trunc('month', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        ) AS range_from,
+        COALESCE(
+          NULLIF($2, '')::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh',
+          NOW()
+        ) AS range_to,
         NOW() AS now
-    `);
-    const weekStart = bounds.rows[0].week_start;
-    const monthStart = bounds.rows[0].month_start;
+    `, [fromRaw, toRaw]);
 
-    const [orderStats, unitStats, bestSellers, slowSellers, eventStats, topViews, topCart, voucherUsage] = await Promise.all([
+    let weekStart = bounds.rows[0].week_start;
+    let monthStart = bounds.rows[0].month_start;
+    let rangeFrom = bounds.rows[0].range_from;
+    let rangeTo = bounds.rows[0].range_to;
+    if (new Date(rangeFrom).getTime() > new Date(rangeTo).getTime()) {
+      const tmp = rangeFrom;
+      rangeFrom = rangeTo;
+      rangeTo = tmp;
+    }
+
+    const [orderStats, unitStats, rangeOrder, rangeUnits, bestSellers, slowSellers, eventStats, topViews, topCart, voucherUsage, dailyRevenue] = await Promise.all([
       query(`
         SELECT
           COUNT(*) FILTER (WHERE created_at >= $1)::int AS orders_week,
@@ -685,20 +704,34 @@ router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, r
         FROM (${SOLD_ITEMS_SQL}) s
       `, [weekStart, monthStart]),
       query(`
+        SELECT
+          COUNT(*)::int AS orders,
+          COALESCE(SUM(total), 0)::int AS revenue,
+          COALESCE(SUM(discount) FILTER (WHERE COALESCE(voucher_code, '') <> ''), 0)::int AS voucher,
+          COUNT(*) FILTER (WHERE COALESCE(voucher_code, '') <> '')::int AS voucher_orders
+        FROM orders
+        WHERE status <> 'cancelled' AND created_at >= $1 AND created_at <= $2
+      `, [rangeFrom, rangeTo]),
+      query(`
+        SELECT COALESCE(SUM(quantity), 0)::int AS units
+        FROM (${SOLD_ITEMS_SQL}) s
+        WHERE created_at >= $1 AND created_at <= $2
+      `, [rangeFrom, rangeTo]),
+      query(`
         SELECT product_id, name, variant,
           SUM(quantity)::int AS quantity,
           SUM(price * quantity)::int AS revenue
         FROM (${SOLD_ITEMS_SQL}) s
-        WHERE created_at >= $1 AND product_id <> ''
+        WHERE created_at >= $1 AND created_at <= $2 AND product_id <> ''
         GROUP BY product_id, name, variant
         ORDER BY quantity DESC, revenue DESC
         LIMIT 10
-      `, [monthStart]),
+      `, [rangeFrom, rangeTo]),
       query(`
         WITH sold AS (
           SELECT product_id, SUM(quantity)::int AS quantity
           FROM (${SOLD_ITEMS_SQL}) s
-          WHERE created_at >= $1 AND product_id <> ''
+          WHERE created_at >= $1 AND created_at <= $2 AND product_id <> ''
           GROUP BY product_id
         )
         SELECT
@@ -707,11 +740,11 @@ router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, r
           COALESCE(sold.quantity, 0)::int AS quantity,
           COALESCE((
             SELECT SUM(e.quantity)::int FROM product_events e
-            WHERE e.product_id = p.id AND e.event_type = 'view' AND e.created_at >= $1
+            WHERE e.product_id = p.id AND e.event_type = 'view' AND e.created_at >= $1 AND e.created_at <= $2
           ), 0) AS views,
           COALESCE((
             SELECT SUM(e.quantity)::int FROM product_events e
-            WHERE e.product_id = p.id AND e.event_type = 'add_to_cart' AND e.created_at >= $1
+            WHERE e.product_id = p.id AND e.event_type = 'add_to_cart' AND e.created_at >= $1 AND e.created_at <= $2
           ), 0) AS cart_adds
         FROM products p
         LEFT JOIN sold ON sold.product_id = p.id::text
@@ -719,33 +752,34 @@ router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, r
           AND COALESCE(sold.quantity, 0) < 3
         ORDER BY COALESCE(sold.quantity, 0) ASC, views DESC, p.name
         LIMIT 15
-      `, [monthStart]),
+      `, [rangeFrom, rangeTo]),
       query(`
         SELECT
-          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'view' AND created_at >= $1), 0)::int AS views_month,
-          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'add_to_cart' AND created_at >= $1), 0)::int AS cart_qty_month,
-          COUNT(*) FILTER (WHERE event_type = 'view' AND created_at >= $1)::int AS view_events_month,
-          COUNT(*) FILTER (WHERE event_type = 'add_to_cart' AND created_at >= $1)::int AS cart_events_month
+          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'view'), 0)::int AS views_month,
+          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'add_to_cart'), 0)::int AS cart_qty_month,
+          COUNT(*) FILTER (WHERE event_type = 'view')::int AS view_events_month,
+          COUNT(*) FILTER (WHERE event_type = 'add_to_cart')::int AS cart_events_month
         FROM product_events
-      `, [monthStart]),
+        WHERE created_at >= $1 AND created_at <= $2
+      `, [rangeFrom, rangeTo]),
       query(`
         SELECT p.id AS product_id, p.name, SUM(e.quantity)::int AS views
         FROM product_events e
         JOIN products p ON p.id = e.product_id
-        WHERE e.event_type = 'view' AND e.created_at >= $1
+        WHERE e.event_type = 'view' AND e.created_at >= $1 AND e.created_at <= $2
         GROUP BY p.id, p.name
         ORDER BY views DESC
         LIMIT 10
-      `, [monthStart]),
+      `, [rangeFrom, rangeTo]),
       query(`
         SELECT p.id AS product_id, p.name, SUM(e.quantity)::int AS quantity, COUNT(*)::int AS times
         FROM product_events e
         JOIN products p ON p.id = e.product_id
-        WHERE e.event_type = 'add_to_cart' AND e.created_at >= $1
+        WHERE e.event_type = 'add_to_cart' AND e.created_at >= $1 AND e.created_at <= $2
         GROUP BY p.id, p.name
         ORDER BY quantity DESC
         LIMIT 10
-      `, [monthStart]),
+      `, [rangeFrom, rangeTo]),
       query(`
         SELECT
           o.voucher_code AS code,
@@ -755,20 +789,39 @@ router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, r
         FROM orders o
         LEFT JOIN vouchers v ON LOWER(v.code) = LOWER(o.voucher_code)
         WHERE o.status <> 'cancelled'
-          AND o.created_at >= $1
+          AND o.created_at >= $1 AND o.created_at <= $2
           AND COALESCE(o.voucher_code, '') <> ''
         GROUP BY o.voucher_code, v.label
         ORDER BY discount DESC, uses DESC
-      `, [monthStart]),
+      `, [rangeFrom, rangeTo]),
+      query(`
+        SELECT
+          (created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS date,
+          COUNT(*)::int AS orders,
+          COALESCE(SUM(total), 0)::int AS revenue
+        FROM orders
+        WHERE status <> 'cancelled' AND created_at >= $1 AND created_at <= $2
+        GROUP BY 1
+        ORDER BY 1
+      `, [rangeFrom, rangeTo]),
     ]);
 
     const o = orderStats.rows[0];
     const u = unitStats.rows[0];
     const e = eventStats.rows[0];
+    const r = rangeOrder.rows[0];
 
     res.json(success({
       weekStart,
       monthStart,
+      rangeFrom,
+      rangeTo,
+      rangeRevenue: r.revenue,
+      rangeOrders: r.orders,
+      rangeUnits: rangeUnits.rows[0].units,
+      rangeVoucher: r.voucher,
+      rangeVoucherOrders: r.voucher_orders,
+      dailyRevenue: dailyRevenue.rows,
       unitsWeek: u.units_week,
       unitsMonth: u.units_month,
       ordersWeek: o.orders_week,

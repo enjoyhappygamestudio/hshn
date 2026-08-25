@@ -427,22 +427,101 @@ function analyticsTable(rows, empty, cols) {
   </table>`;
 }
 
+let analyticsRange = null;
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function toInputLocal(d) {
+  const x = d instanceof Date ? d : new Date(d);
+  return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}T${pad2(x.getHours())}:${pad2(x.getMinutes())}`;
+}
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function defaultAnalyticsRange() {
+  const to = new Date();
+  const from = startOfDay(new Date(to.getFullYear(), to.getMonth(), 1));
+  return { from: toInputLocal(from), to: toInputLocal(to) };
+}
+function analyticsPreset(kind) {
+  const now = new Date();
+  if (kind === 'today') return { from: toInputLocal(startOfDay(now)), to: toInputLocal(now) };
+  if (kind === '7d') {
+    const from = startOfDay(new Date(now.getTime() - 6 * 86400000));
+    return { from: toInputLocal(from), to: toInputLocal(now) };
+  }
+  if (kind === 'month') {
+    return { from: toInputLocal(startOfDay(new Date(now.getFullYear(), now.getMonth(), 1))), to: toInputLocal(now) };
+  }
+  if (kind === 'prev-month') {
+    const from = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 0);
+    return { from: toInputLocal(from), to: toInputLocal(to) };
+  }
+  return defaultAnalyticsRange();
+}
+
 async function renderAnalytics(el) {
+  if (!analyticsRange) analyticsRange = defaultAnalyticsRange();
   el.innerHTML = '<p>Đang tải...</p>';
   try {
-    const data = await api('GET', '/admin/analytics');
+    const q = `from=${encodeURIComponent(analyticsRange.from)}&to=${encodeURIComponent(analyticsRange.to)}`;
+    const data = await api('GET', `/admin/analytics?${q}`);
     const d = data.data;
     const weekLabel = d.weekStart ? new Date(d.weekStart).toLocaleDateString('vi-VN') : '';
     const monthLabel = d.monthStart ? new Date(d.monthStart).toLocaleDateString('vi-VN') : '';
+    const fromLabel = d.rangeFrom ? new Date(d.rangeFrom).toLocaleString('vi-VN') : analyticsRange.from.replace('T', ' ');
+    const toLabel = d.rangeTo ? new Date(d.rangeTo).toLocaleString('vi-VN') : analyticsRange.to.replace('T', ' ');
     const maxBest = Math.max(1, ...(d.bestSellers || []).map(p => p.quantity || 0));
+    const days = d.dailyRevenue || [];
+    const maxDayRev = Math.max(1, ...days.map(x => x.revenue || 0));
     el.innerHTML = `
-      <p class="analytics-period">Tuần này từ ${esc(weekLabel)} · Tháng này từ ${esc(monthLabel)} (giờ Việt Nam). Đơn hủy không tính.</p>
+      <div class="card">
+        <div class="card-header">
+          <h3>Doanh thu theo khoảng thời gian</h3>
+        </div>
+        <div class="range-bar">
+          <label>Từ
+            <input type="datetime-local" id="an-from" value="${esc(analyticsRange.from)}">
+          </label>
+          <label>Đến
+            <input type="datetime-local" id="an-to" value="${esc(analyticsRange.to)}">
+          </label>
+          <button class="btn btn-primary btn-sm" id="an-apply">Xem</button>
+          <button class="btn btn-outline btn-sm" data-an-preset="today">Hôm nay</button>
+          <button class="btn btn-outline btn-sm" data-an-preset="7d">7 ngày</button>
+          <button class="btn btn-outline btn-sm" data-an-preset="month">Tháng này</button>
+          <button class="btn btn-outline btn-sm" data-an-preset="prev-month">Tháng trước</button>
+        </div>
+        <p class="analytics-period" style="margin:0 20px 12px">Khoảng chọn: ${esc(fromLabel)} → ${esc(toLabel)} (giờ máy). Đơn hủy không tính.</p>
+        <div class="stat-grid" style="margin:0 16px 16px">
+          <div class="stat-card"><span class="value">${fmt(d.rangeRevenue)}₫</span><span class="label">Doanh thu khoảng chọn</span></div>
+          <div class="stat-card"><span class="value">${fmt(d.rangeOrders)}</span><span class="label">Đơn hàng</span></div>
+          <div class="stat-card"><span class="value">${fmt(d.rangeUnits)}</span><span class="label">Số lượng bán</span></div>
+          <div class="stat-card"><span class="value">${fmt(d.rangeVoucher)}₫</span><span class="label">Voucher đã dùng</span></div>
+        </div>
+        <div class="table-wrap">
+          ${days.length ? `<table>
+            <thead><tr><th>Ngày</th><th>Đơn</th><th>Doanh thu</th><th></th></tr></thead>
+            <tbody>
+              ${days.map(row => `<tr>
+                <td>${esc(String(row.date).slice(0, 10).split('-').reverse().join('/'))}</td>
+                <td class="num">${fmt(row.orders)}</td>
+                <td class="num">${fmt(row.revenue)}₫</td>
+                <td style="width:40%"><div class="rank-bar"><span style="width:${Math.round((row.revenue / maxDayRev) * 100)}%"></span></div></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : `<p class="empty-hint">Không có đơn trong khoảng thời gian này.</p>`}
+        </div>
+      </div>
+      <p class="analytics-period">So sánh nhanh: tuần này từ ${esc(weekLabel)} · tháng này từ ${esc(monthLabel)} (giờ Việt Nam).</p>
       <div class="stat-grid">
         <div class="stat-card"><span class="value">${fmt(d.unitsWeek)}</span><span class="label">Số lượng bán trong tuần</span></div>
         <div class="stat-card"><span class="value">${fmt(d.unitsMonth)}</span><span class="label">Số lượng bán trong tháng</span></div>
-        <div class="stat-card"><span class="value">${fmt(d.viewsMonth)}</span><span class="label">Lượt xem sản phẩm trong tháng</span></div>
-        <div class="stat-card"><span class="value">${fmt(d.cartQtyMonth)}</span><span class="label">Số lượng thêm vào giỏ hàng (tháng)</span></div>
-        <div class="stat-card"><span class="value">${fmt(d.voucherMonth)}₫</span><span class="label">Giá trị voucher khách đã dùng (tháng)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.viewsMonth)}</span><span class="label">Lượt xem sản phẩm (khoảng chọn)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.cartQtyMonth)}</span><span class="label">Số lượng thêm vào giỏ (khoảng chọn)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.voucherMonth)}₫</span><span class="label">Giá trị voucher khoảng chọn</span></div>
         <div class="stat-card"><span class="value">${fmt(d.voucherWeek)}₫</span><span class="label">Giá trị voucher trong tuần</span></div>
       </div>
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
@@ -450,12 +529,12 @@ async function renderAnalytics(el) {
         <div class="stat-card"><span class="value">${fmt(d.ordersMonth)}</span><span class="label">Đơn trong tháng</span></div>
         <div class="stat-card"><span class="value">${fmt(d.revenueWeek)}₫</span><span class="label">Doanh thu tuần</span></div>
         <div class="stat-card"><span class="value">${fmt(d.revenueMonth)}₫</span><span class="label">Doanh thu tháng</span></div>
-        <div class="stat-card"><span class="value">${fmt(d.voucherOrdersMonth)}</span><span class="label">Đơn dùng voucher (tháng)</span></div>
-        <div class="stat-card"><span class="value">${fmt(d.cartEventsMonth)}</span><span class="label">Lần bấm thêm giỏ (tháng)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.voucherOrdersMonth)}</span><span class="label">Đơn dùng voucher (khoảng chọn)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.cartEventsMonth)}</span><span class="label">Lần bấm thêm giỏ (khoảng chọn)</span></div>
       </div>
       <div class="two-col">
         <div class="card">
-          <div class="card-header"><h3>Sản phẩm bán chạy (tháng)</h3></div>
+          <div class="card-header"><h3>Sản phẩm bán chạy (khoảng chọn)</h3></div>
           <div class="table-wrap">
             ${(d.bestSellers || []).length ? `<table>
               <thead><tr><th>Sản phẩm</th><th>Phân loại</th><th>Số lượng</th><th>Doanh thu</th></tr></thead>
@@ -470,11 +549,11 @@ async function renderAnalytics(el) {
                   <td class="num">${fmt(p.revenue)}₫</td>
                 </tr>`).join('')}
               </tbody>
-            </table>` : `<p class="empty-hint">Chưa có đơn hàng trong tháng.</p>`}
+            </table>` : `<p class="empty-hint">Chưa có đơn hàng trong khoảng chọn.</p>`}
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>Sản phẩm bán chậm — cần đẩy (tháng)</h3></div>
+          <div class="card-header"><h3>Sản phẩm bán chậm — cần đẩy (khoảng chọn)</h3></div>
           <div class="table-wrap">
             ${(d.slowSellers || []).length ? `<table>
               <thead><tr><th>Sản phẩm</th><th>Đã bán</th><th>Xem</th><th>Thêm giỏ</th><th>Gợi ý</th></tr></thead>
@@ -487,13 +566,13 @@ async function renderAnalytics(el) {
                   <td><span class="push-tag">${esc(slowReason(p))}</span></td>
                 </tr>`).join('')}
               </tbody>
-            </table>` : `<p class="empty-hint">Chưa có sản phẩm đang bán.</p>`}
+            </table>` : `<p class="empty-hint">Không có sản phẩm bán chậm trong khoảng này.</p>`}
           </div>
         </div>
       </div>
       <div class="two-col">
         <div class="card">
-          <div class="card-header"><h3>Lượt xem sản phẩm trong tháng</h3></div>
+          <div class="card-header"><h3>Lượt xem sản phẩm (khoảng chọn)</h3></div>
           <div class="table-wrap">
             ${analyticsTable(d.topViews || [], 'Chưa ghi nhận lượt xem. Số liệu bắt đầu sau khi app được cập nhật.', [
               { h: 'Sản phẩm', cell: p => esc(p.name) },
@@ -502,7 +581,7 @@ async function renderAnalytics(el) {
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>Sản phẩm được thêm vào giỏ (tháng)</h3></div>
+          <div class="card-header"><h3>Sản phẩm được thêm vào giỏ (khoảng chọn)</h3></div>
           <div class="table-wrap">
             ${analyticsTable(d.topCart || [], 'Chưa ghi nhận thêm giỏ. Số liệu bắt đầu sau khi app được cập nhật.', [
               { h: 'Sản phẩm', cell: p => esc(p.name) },
@@ -513,7 +592,7 @@ async function renderAnalytics(el) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Giá trị voucher khách hàng đã sử dụng (tháng)</h3></div>
+        <div class="card-header"><h3>Giá trị voucher khách hàng đã sử dụng (khoảng chọn)</h3></div>
         <div class="table-wrap">
           ${(d.voucherUsage || []).length ? `<table>
             <thead><tr><th>Mã</th><th>Tên</th><th>Số đơn dùng</th><th>Giá trị giảm</th></tr></thead>
@@ -526,14 +605,30 @@ async function renderAnalytics(el) {
               </tr>`).join('')}
               <tr>
                 <td colspan="2"><strong>Tổng</strong></td>
-                <td class="num"><strong>${fmt(d.voucherOrdersMonth)}</strong></td>
-                <td class="num"><strong>${fmt(d.voucherMonth)}₫</strong></td>
+                <td class="num"><strong>${fmt(d.rangeVoucherOrders)}</strong></td>
+                <td class="num"><strong>${fmt(d.rangeVoucher)}₫</strong></td>
               </tr>
             </tbody>
-          </table>` : `<p class="empty-hint">Chưa có đơn nào dùng voucher trong tháng.</p>`}
+          </table>` : `<p class="empty-hint">Chưa có đơn nào dùng voucher trong khoảng chọn.</p>`}
         </div>
       </div>
     `;
+
+    const applyRange = () => {
+      const from = $('an-from')?.value;
+      const to = $('an-to')?.value;
+      if (!from || !to) return;
+      if (from > to) { alert('Thời gian bắt đầu phải trước thời gian kết thúc'); return; }
+      analyticsRange = { from, to };
+      renderAnalytics(el);
+    };
+    $('an-apply')?.addEventListener('click', applyRange);
+    el.querySelectorAll('[data-an-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        analyticsRange = analyticsPreset(btn.dataset.anPreset);
+        renderAnalytics(el);
+      });
+    });
   } catch (e) {
     el.innerHTML = `<p style="color:var(--danger)">Lỗi: ${e.message}</p>`;
   }

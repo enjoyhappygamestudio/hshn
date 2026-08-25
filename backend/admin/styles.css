@@ -134,6 +134,18 @@ tr:hover td { background: #F8FAFA; }
 .order-code-link:hover { text-decoration: underline; }
 .empty-hint { padding: 28px 20px; text-align: center; color: var(--text-secondary); font-size: 13px; }
 .analytics-period { font-size: 13px; color: var(--text-secondary); margin: -8px 0 16px; }
+.range-bar {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+  padding: 14px 20px 8px;
+}
+.range-bar label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--text-secondary); font-weight: 600;
+}
+.range-bar input[type="datetime-local"] {
+  padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit; color: var(--text); background: var(--white);
+}
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .rank-bar { height: 4px; background: var(--border); border-radius: 4px; margin-top: 6px; overflow: hidden; }
 .rank-bar span { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
@@ -297,6 +309,7 @@ tr:hover td { background: #F8FAFA; }
   .form-row { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .two-col { grid-template-columns: 1fr; }
+  .range-bar { padding: 12px 14px 6px; }
   .content { padding: 16px; }
   .topbar { padding: 12px 16px; }
   .topbar h2 { font-size: 15px; }
