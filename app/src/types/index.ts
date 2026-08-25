@@ -61,7 +61,7 @@ export interface Category {
 }
 
 export interface DeliveryState {
-  mode: 'hoatoc' | 'express2h' | 'interprovince' | 'appointment' | null;
+  mode: 'hoatoc' | 'express2h' | 'appointment' | null;
   date: string | null;
   timeSlot: string | null;
 }

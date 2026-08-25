@@ -26,7 +26,6 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation, route 
   const slotLabel = () => {
     if (delivery.mode === 'hoatoc') return 'Siêu tốc (30 phút)';
     if (delivery.mode === 'express2h') return 'Siêu tốc tiết kiệm (1 giờ)';
-    if (delivery.mode === 'interprovince') return '4H siêu rẻ (4 giờ)';
     if (delivery.mode === 'appointment' && delivery.date && delivery.timeSlot) {
       const t = TIME_SLOTS.find((x) => x.value === delivery.timeSlot);
       return `${formatDateVN(delivery.date)}, ${t ? t.label : ''}`;

@@ -7,6 +7,8 @@ export interface CarrierFeeRequest {
   toLng: number;
   weight: number;
   cod?: number;
+  // Dịch vụ cụ thể cần báo giá; bỏ trống thì carrier tự chọn dịch vụ mặc định
+  serviceId?: string;
 }
 
 export interface CarrierFeeResult {
@@ -217,6 +219,25 @@ class ViettelCarrier implements CarrierService {
 // nếu không phí khách thấy sẽ là của dịch vụ khác với đơn thật.
 const DEFAULT_SERVICE = 'BIKE';
 
+// Lựa chọn "Thời gian giao" trên app → dịch vụ AhaMove tương ứng.
+// Gửi phần đuôi (BIKE/ECO), AhaMove tự ghép tiền tố thành phố (HAN-BIKE...).
+const SERVICE_BY_DELIVERY_MODE: Record<string, string> = {
+  hoatoc: 'BIKE',        // Siêu Tốc
+  express2h: 'ECO',      // Siêu Tốc - Tiết Kiệm
+  appointment: 'ECO',    // hẹn ngày giờ, đi kèm order_time
+  interprovince: 'ECO',  // đơn cũ — app không còn hiển thị lựa chọn này
+};
+
+export function serviceForDeliveryMode(mode?: string | null): string | undefined {
+  return mode ? SERVICE_BY_DELIVERY_MODE[mode] : undefined;
+}
+
+// AhaMove trả service_id có tiền tố thành phố (HAN-ECO) nhưng chỉ nhận phần
+// đuôi khi gửi lên, nên luôn quy về đuôi để dùng lại giữa báo giá và đặt đơn.
+function bareServiceId(serviceId?: string): string | undefined {
+  return serviceId ? serviceId.replace(/^[A-Z]{2,4}-/, '') : undefined;
+}
+
 class AhaMoveCarrier implements CarrierService {
   name = 'AhaMove';
   enabled = config.shipping.ahamove.enabled;
@@ -281,26 +302,28 @@ class AhaMoveCarrier implements CarrierService {
   }
 
   private async estimate(req: CarrierFeeRequest): Promise<{ serviceId: string; fee: number }> {
+    const wanted = bareServiceId(req.serviceId) || DEFAULT_SERVICE;
     const data = await this.call('POST', '/orders/estimates', {
       order_time: 0,
       path: [
         { lat: req.fromLat || config.shipping.ahamove.shopLat, lng: req.fromLng || config.shipping.ahamove.shopLng, address: this.shopAddress, name: this.shopName, mobile: this.normalizePhone(this.shopPhone) },
         { lat: req.toLat, lng: req.toLng, address: 'Địa chỉ giao hàng', name: 'Khách', mobile: '84981230001' },
       ],
-      group_services: [{ _id: DEFAULT_SERVICE, group_requests: [] }, { _id: 'ECO', group_requests: [] }],
+      group_services: [{ _id: wanted, group_requests: [] }],
       payment_method: 'CASH',
       items: [{ _id: 'GOODS', num: 1, name: 'Hàng hóa', price: req.cod || 0 }],
       package_detail: [{ weight: Math.max(0.5, req.weight) }],
     });
-    const usable = (Array.isArray(data) ? data : []).filter(
+    const picked = (Array.isArray(data) ? data : []).find(
       (s: any) => !s.error && (s.data?.total_fee || s.data?.total_price),
     );
-    // Ưu tiên dịch vụ mặc định để giá báo cho khách khớp dịch vụ sẽ đặt; hết mới lấy dịch vụ còn lại
-    const picked =
-      usable.find((s: any) => String(s.service_id || '').toUpperCase().includes(DEFAULT_SERVICE)) || usable[0];
+    if (!picked) {
+      const reason = (Array.isArray(data) ? data : []).find((s: any) => s.error)?.error;
+      throw new Error(reason?.description || `AhaMove không báo giá được dịch vụ ${wanted}`);
+    }
     return {
-      serviceId: picked?.service_id || DEFAULT_SERVICE,
-      fee: picked?.data?.total_fee || picked?.data?.total_price || 0,
+      serviceId: bareServiceId(picked.service_id) || wanted,
+      fee: picked.data?.total_fee || picked.data?.total_price || 0,
     };
   }
 
@@ -333,7 +356,7 @@ class AhaMoveCarrier implements CarrierService {
           remarks: req.note || '',
         },
       ],
-      group_service_id: req.serviceId || DEFAULT_SERVICE,
+      group_service_id: bareServiceId(req.serviceId) || DEFAULT_SERVICE,
       group_requests: [],
       payment_method: 'CASH',
       items: req.items.map((i, idx) => ({

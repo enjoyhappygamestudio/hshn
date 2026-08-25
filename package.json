@@ -10,6 +10,7 @@
     "stop:all": "bash scripts/stop.sh all",
     "status": "bash scripts/status.sh",
     "bench:media": "node scripts/bench-media.mjs",
+    "aha:services": "node scripts/aha-services.mjs",
     "dev:expo": "npm --prefix app start"
   }
 }

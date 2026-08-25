@@ -273,8 +273,20 @@ export async function fetchShippingPartners(lat?: number, lng?: number, weight?:
   return res.data || [];
 }
 
-export async function fetchShippingFee(carrier: string, lat?: number, lng?: number, weight?: number): Promise<{ fee: number; estimatedDays: number; serviceName: string; carrier: string }[]> {
-  const res: any = await api.post('/shipping/calculate', { carrier, toLat: lat, toLng: lng, weight });
+export async function fetchShippingFee(
+  carrier: string,
+  lat?: number,
+  lng?: number,
+  weight?: number,
+  deliveryMode?: string | null,
+): Promise<{ fee: number; estimatedDays: number; serviceName: string; carrier: string }[]> {
+  const res: any = await api.post('/shipping/calculate', {
+    carrier,
+    toLat: lat,
+    toLng: lng,
+    weight,
+    delivery_mode: deliveryMode,
+  });
   return res.data || [];
 }
 

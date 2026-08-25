@@ -7,7 +7,7 @@ interface CheckoutStore {
   note: string;
   customShipFee: number | null;
 
-  setDeliveryMode: (mode: 'hoatoc' | 'express2h' | 'interprovince' | 'appointment') => void;
+  setDeliveryMode: (mode: 'hoatoc' | 'express2h' | 'appointment') => void;
   setDeliveryDate: (date: string | null) => void;
   setDeliveryTimeSlot: (slot: string | null) => void;
   setPaymentMethod: (method: PaymentMethod | null) => void;
@@ -32,7 +32,7 @@ export const useCheckoutStore = create<CheckoutStore>((set, get) => ({
   customShipFee: null,
 
   setDeliveryMode: (mode) => {
-    if (mode === 'hoatoc' || mode === 'express2h' || mode === 'interprovince') {
+    if (mode === 'hoatoc' || mode === 'express2h') {
       set({ delivery: { mode, date: null, timeSlot: null } });
     } else {
       const today = new Date().toISOString().split('T')[0];
@@ -56,7 +56,7 @@ export const useCheckoutStore = create<CheckoutStore>((set, get) => ({
 
   deliveryIsValid: () => {
     const d = get().delivery;
-    if (d.mode === 'hoatoc' || d.mode === 'express2h' || d.mode === 'interprovince') return true;
+    if (d.mode === 'hoatoc' || d.mode === 'express2h') return true;
     if (d.mode === 'appointment') return !!(d.date && d.timeSlot);
     return false;
   },

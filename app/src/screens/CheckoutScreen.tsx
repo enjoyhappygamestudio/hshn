@@ -99,7 +99,13 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     setBaseFee(null);
     setFeeLoading(true);
     try {
-      const results = await fetchShippingFee(partner.name, lat, lng, cartWeight());
+      const results = await fetchShippingFee(
+        partner.name,
+        lat,
+        lng,
+        cartWeight(),
+        useCheckoutStore.getState().delivery.mode,
+      );
       if (reqId !== feeReqRef.current) return;
       const r = Array.isArray(results) ? results[0] : undefined;
       setBaseFee(r && r.fee > 0 ? r.fee : null);
@@ -114,6 +120,16 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     setSelectedPartner(partner.id);
     loadFee(partner, deliveryCoords?.lat, deliveryCoords?.lng);
   }, [loadFee, deliveryCoords]);
+
+  // Mỗi lựa chọn giao hàng là một dịch vụ AhaMove khác nhau → phải báo giá lại
+  const prevModeRef = useRef(delivery.mode);
+  useEffect(() => {
+    if (prevModeRef.current === delivery.mode) return;
+    prevModeRef.current = delivery.mode;
+    if (!selectedPartner) return;
+    const p = shippingPartners.find((x) => x.id === selectedPartner);
+    if (p) loadFee(p, deliveryCoords?.lat, deliveryCoords?.lng);
+  }, [delivery.mode, selectedPartner, shippingPartners, loadFee, deliveryCoords]);
 
   useEffect(() => {
     (async () => {
@@ -390,21 +406,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
               <TouchableOpacity
                 style={[
                   styles.slot,
-                  delivery.mode === 'interprovince' && styles.slotSel,
-                ]}
-                onPress={() => setDeliveryMode('interprovince')}
-              >
-                <Text style={styles.slotText}>🛵 4H</Text>
-                <Text style={styles.slotSub}>Giao siêu rẻ trong 4h</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.slot,
                   delivery.mode === 'appointment' && styles.slotSel,
                 ]}
                 onPress={() => setDeliveryMode('appointment')}
               >
                 <Text style={styles.slotText}>📅 Hẹn ngày giao</Text>
+                <Text style={styles.slotSub}>Chọn ngày & giờ</Text>
               </TouchableOpacity>
             </View>
 
@@ -453,11 +460,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
             {delivery.mode === 'express2h' && (
               <Text style={styles.feeNote}>
                 🚀 Giao tiết kiệm trong 1 giờ tại nội thành Hà Nội.
-              </Text>
-            )}
-            {delivery.mode === 'interprovince' && (
-              <Text style={styles.feeNote}>
-                🛵 Giao 4H — siêu rẻ, thời gian dự kiến trong 4 giờ.
               </Text>
             )}
           </View>

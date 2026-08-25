@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../utils/db';
 import { success, error } from '../utils/response';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { calculateFee, createShipOrder, trackShipOrder, getActiveCarriers } from '../services/carrier';
+import { calculateFee, createShipOrder, trackShipOrder, getActiveCarriers, serviceForDeliveryMode } from '../services/carrier';
 import { config } from '../config';
 
 const router = Router();
@@ -90,12 +90,20 @@ router.get('/partners', async (req: Request, res: Response) => {
 // POST /api/shipping/calculate — Tính phí vận chuyển thực tế (chỉ khi có tọa độ địa chỉ giao)
 router.post('/calculate', async (req: Request, res: Response) => {
   try {
-    const { carrier, toLat, toLng, weight, cod } = req.body;
+    const { carrier, toLat, toLng, weight, cod, delivery_mode } = req.body;
     if (carrier && typeof toLat === 'number' && typeof toLng === 'number') {
       const active = getActiveCarriers();
       const c = active.find(a => a.name === carrier);
       if (c) {
-        const result = await c.calculateFee({ fromLat: SHOP_LAT, fromLng: SHOP_LNG, toLat, toLng, weight: weight || 1, cod });
+        const result = await c.calculateFee({
+          fromLat: SHOP_LAT,
+          fromLng: SHOP_LNG,
+          toLat,
+          toLng,
+          weight: weight || 1,
+          cod,
+          serviceId: serviceForDeliveryMode(delivery_mode),
+        });
         return res.json(success([result]));
       }
     }

@@ -1,5 +1,5 @@
 import { query } from '../utils/db';
-import { createShipOrder, getActiveCarriers, quoteFee } from './carrier';
+import { createShipOrder, getActiveCarriers, quoteFee, serviceForDeliveryMode } from './carrier';
 
 // Tạo đơn vận chuyển THẬT (AhaMove) cho đơn hàng khi admin xác nhận đủ hàng.
 // Chỉ chạy khi đơn có chọn đối tác vận chuyển đang kích hoạt.
@@ -43,12 +43,13 @@ export async function createShippingForOrder(orderId: string): Promise<void> {
   const weight = Math.max(0.5, shipItems.reduce((s: number, i: any) => s + i.quantity * i.weight, 0));
   const quotedFee = Number(order.shipping_fee) || 0;
   let shipFee = quotedFee;
-  let serviceId: string | undefined;
+  // Dịch vụ phải khớp lựa chọn khách đã chọn ở checkout, vì mỗi dịch vụ một bảng giá
+  let serviceId = serviceForDeliveryMode(order.delivery_mode);
   try {
-    const quote = await quoteFee(partnerName, { toLat, toLng, weight, cod: 0 });
+    const quote = await quoteFee(partnerName, { toLat, toLng, weight, cod: 0, serviceId });
     if (quote && quote.fee > 0) {
       shipFee = quote.fee;
-      serviceId = quote.serviceId;
+      serviceId = quote.serviceId || serviceId;
     }
   } catch (quoteErr: any) {
     console.warn(`[orderShipping] Báo giá lại thất bại, giữ phí cũ: ${quoteErr.message}`);
