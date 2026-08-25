@@ -28,6 +28,17 @@ import { formatMoney } from '../utils/format';
 const { width: SCREEN_W } = Dimensions.get('window');
 const VIDEO_CARD_W = (SCREEN_W - 14 * 2 - 8 * 1) / 2;
 
+// Mũi tên chiếm cột riêng hai bên nên đúng 4 danh mục lọt màn hình mà không bị che.
+const CAT_GAP = 8;
+const CAT_H_PADDING = 6;
+const CAT_ARROW_SLOT = 26;
+const CAT_ARROW_SIZE = 26;
+const CAT_PILL_W =
+  (SCREEN_W - CAT_ARROW_SLOT * 2 - CAT_H_PADDING * 2 - CAT_GAP * 3) / 4;
+const CAT_ICON_SIZE = CAT_PILL_W - 12;
+// Canh mũi tên theo tâm icon thay vì tâm cả ô (ô còn có tên danh mục bên dưới).
+const CAT_ARROW_TOP = 10 + CAT_ICON_SIZE / 2 - CAT_ARROW_SIZE / 2;
+
 interface HomeScreenProps {
   navigation: any;
 }
@@ -36,8 +47,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredVideos, setFeaturedVideos] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [canScrollCatLeft, setCanScrollCatLeft] = useState(false);
+  const [canScrollCatRight, setCanScrollCatRight] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const catScrollRef = useRef<ScrollView>(null);
+  const catScrollX = useRef(0);
+  const catContentW = useRef(0);
+  const catViewportW = useRef(0);
+
+  const updateCatArrows = useCallback(() => {
+    const x = catScrollX.current;
+    const maxX = catContentW.current - catViewportW.current;
+    setCanScrollCatLeft(x > 4);
+    setCanScrollCatRight(maxX > 4 && x < maxX - 4);
+  }, []);
   const cartCount = useCartStore((s) => s.count());
   const customer = useAuthStore((s) => s.customer);
   const deliveryLocation = customer?.address?.split(',').pop()?.trim() || '';
@@ -104,6 +129,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     loadData();
   }, [loadData]);
 
+  const handleCategoryPress = useCallback((categoryId: string) => {
+    setSelectedCategoryId((current) => (current === categoryId ? null : categoryId));
+  }, []);
+
+  const handleCatScroll = useCallback((e: any) => {
+    catScrollX.current = e.nativeEvent.contentOffset.x;
+    updateCatArrows();
+  }, [updateCatArrows]);
+
+  const handleCatContentSize = useCallback((w: number) => {
+    catContentW.current = w;
+    updateCatArrows();
+  }, [updateCatArrows]);
+
+  const handleCatLayout = useCallback((e: any) => {
+    catViewportW.current = e.nativeEvent.layout.width;
+    updateCatArrows();
+  }, [updateCatArrows]);
+
+  const scrollCategories = useCallback((direction: 1 | -1) => {
+    const step = CAT_PILL_W + CAT_GAP;
+    const maxX = Math.max(0, catContentW.current - catViewportW.current);
+    const next = Math.min(Math.max(catScrollX.current + direction * step * 2, 0), maxX);
+    catScrollRef.current?.scrollTo({ x: next, animated: true });
+  }, []);
+
   const productsByCategory = useCallback(() => {
     const map: Record<string, { category: Category; products: Product[] }> = {};
     const catMap: Record<string, Category> = {};
@@ -114,8 +165,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (!map[catId]) map[catId] = { category: catMap[catId] || { id: catId, name: 'Khác', icon: '📦' }, products: [] };
       map[catId].products.push(p);
     });
-    return Object.values(map);
-  }, [products, categories]);
+    const sections = Object.values(map);
+    return selectedCategoryId
+      ? sections.filter((s) => s.category.id === selectedCategoryId)
+      : sections;
+  }, [products, categories, selectedCategoryId]);
 
   if (isLoading) {
     return (
@@ -171,7 +225,70 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {featuredVideos.length > 0 && (
+        <View style={styles.catWrap}>
+          <View style={styles.catArrowSlot}>
+            {canScrollCatLeft && (
+              <TouchableOpacity
+                style={styles.catArrowBtn}
+                onPress={() => scrollCategories(-1)}
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              >
+                <Text style={styles.catArrowText}>‹</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView
+            ref={catScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.catScroll}
+            contentContainerStyle={styles.catContent}
+            onScroll={handleCatScroll}
+            onContentSizeChange={handleCatContentSize}
+            onLayout={handleCatLayout}
+            scrollEventThrottle={16}
+          >
+            {categories.map((cat) => {
+              const active = selectedCategoryId === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={styles.catPill}
+                  onPress={() => handleCategoryPress(cat.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.catIcon, active && styles.catIconActive]}>
+                    <Text style={styles.catEmoji}>{cat.icon}</Text>
+                  </View>
+                  <Text style={[styles.catName, active && styles.catNameActive]} numberOfLines={2}>
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.catArrowSlot}>
+            {canScrollCatRight && (
+              <TouchableOpacity
+                style={styles.catArrowBtn}
+                onPress={() => scrollCategories(1)}
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              >
+                <Text style={styles.catArrowText}>›</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {selectedCategoryId && (
+          <TouchableOpacity style={styles.clearFilter} onPress={() => setSelectedCategoryId(null)}>
+            <Text style={styles.clearFilterText}>✕ Bỏ lọc danh mục</Text>
+          </TouchableOpacity>
+        )}
+
+        {featuredVideos.length > 0 && !selectedCategoryId && (
           <View style={styles.videoSection}>
             <View style={styles.sectionHead}>
               <Text style={styles.sectionTitle}>Video</Text>
@@ -235,38 +352,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         )}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.catScroll}
-          contentContainerStyle={styles.catContent}
-        >
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={styles.catPill}
-              onPress={() => navigation.navigate('CategoryTab')}
-            >
-              <View style={styles.catIcon}>
-                <Text style={styles.catEmoji}>{cat.icon}</Text>
-              </View>
-              <Text style={styles.catName}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
         {catSections.map(({ category, products: catProds }) => (
           <View key={category.id}>
             <View style={styles.section}>
               <View style={styles.sectionHead}>
                 <Text style={styles.sectionTitle}>{category.icon} {category.name}</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('VideoTab')}>
-                  <Text style={styles.sectionLink}>Xem tất cả</Text>
-                </TouchableOpacity>
+                {selectedCategoryId !== category.id && catProds.length > 6 && (
+                  <TouchableOpacity onPress={() => handleCategoryPress(category.id)}>
+                    <Text style={styles.sectionLink}>Xem tất cả</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
             <View style={styles.grid2}>
-              {catProds.slice(0, 6).map((product) => (
+              {(selectedCategoryId === category.id ? catProds : catProds.slice(0, 6)).map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
@@ -279,7 +378,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ))}
 
         {catSections.length === 0 && (
-          <EmptyState icon="🦐" title="Chưa có sản phẩm nào" />
+          <EmptyState
+            icon="🦐"
+            title={selectedCategoryId ? 'Danh mục này chưa có sản phẩm' : 'Chưa có sản phẩm nào'}
+          />
         )}
 
         <View style={{ height: 20 }} />
@@ -371,12 +473,34 @@ const styles = StyleSheet.create({
   videoHShop: { fontSize: 10, color: colors.muted },
   videoHName: { fontSize: 12, fontWeight: '700', color: colors.navy },
   videoHPrice: { fontSize: 12, fontWeight: '800', color: colors.coral, fontFamily: fonts.numeric },
-  catScroll: { maxHeight: 100, marginTop: 4 },
-  catContent: { paddingHorizontal: 18, paddingVertical: 10, gap: 10 },
-  catPill: { width: 74, alignItems: 'center' },
+  catWrap: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 },
+  catArrowSlot: {
+    width: CAT_ARROW_SLOT,
+    paddingTop: CAT_ARROW_TOP,
+    alignItems: 'center',
+  },
+  catArrowBtn: {
+    width: CAT_ARROW_SIZE,
+    height: CAT_ARROW_SIZE,
+    borderRadius: CAT_ARROW_SIZE / 2,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catArrowText: {
+    fontSize: 17,
+    lineHeight: 19,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  catScroll: { flex: 1, maxHeight: 116 },
+  catContent: { paddingHorizontal: CAT_H_PADDING, paddingVertical: 10, gap: CAT_GAP },
+  catPill: { width: CAT_PILL_W, alignItems: 'center' },
   catIcon: {
-    width: 60,
-    height: 60,
+    width: CAT_ICON_SIZE,
+    height: CAT_ICON_SIZE,
     borderRadius: 18,
     backgroundColor: colors.mint,
     borderWidth: 1,
@@ -384,8 +508,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  catIconActive: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.white,
+  },
   catEmoji: { fontSize: 26 },
-  catName: { fontSize: 11.5, fontWeight: '600', color: colors.navy, marginTop: 6 },
+  catName: { fontSize: 11.5, fontWeight: '600', color: colors.navy, marginTop: 6, textAlign: 'center' },
+  catNameActive: { color: colors.primary, fontWeight: '800' },
+  clearFilter: { paddingHorizontal: 18, paddingBottom: 4 },
+  clearFilterText: { fontSize: 12, color: colors.primary, fontWeight: '700' },
   section: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontWeight: '800', color: colors.navy, fontSize: 15 },

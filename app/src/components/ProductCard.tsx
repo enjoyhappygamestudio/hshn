@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { Product } from '../types';
 import { colors, radii, shadows, fonts } from '../constants/theme';
 import { formatMoney } from '../utils/format';
 import { mediaUrl } from '../utils/media';
+import { useCartStore } from '../stores/cartStore';
 
 interface ProductCardProps {
   product: Product;
@@ -22,7 +23,10 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = React.memo(
   ({ product, onPress, onAddToCart, cardWidth }) => {
-    const [added, setAdded] = useState(false);
+    const cartQty = useCartStore((s) =>
+      s.items.reduce((sum, i) => (i.productId === product.id ? sum + i.quantity : sum), 0),
+    );
+    const inCart = cartQty > 0;
 
     const salePct =
       product.oldPrice && !product.isOutOfStock
@@ -35,11 +39,13 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(
     const handleAdd = useCallback(
       (e: any) => {
         e.stopPropagation?.();
-        onAddToCart(product);
-        setAdded(true);
-        setTimeout(() => setAdded(false), 1000);
+        if (inCart) {
+          useCartStore.getState().removeItem(product.id);
+        } else {
+          onAddToCart(product);
+        }
       },
-      [product, onAddToCart],
+      [inCart, product, onAddToCart],
     );
 
     return (
@@ -66,11 +72,16 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(
           )}
           {!product.isOutOfStock && (
             <TouchableOpacity
-              style={styles.cartIconBtn}
+              style={[styles.cartIconBtn, inCart && styles.cartIconBtnActive]}
               onPress={handleAdd}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.cartIconText}>{added ? '✓' : '🛒'}</Text>
+              <Text style={styles.cartIconText}>🛒</Text>
+              {inCart && (
+                <View style={styles.cartQtyBadge}>
+                  <Text style={styles.cartQtyText}>+{cartQty}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -169,7 +180,30 @@ const styles = StyleSheet.create({
     zIndex: 3,
     ...shadows.card,
   },
+  cartIconBtnActive: {
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+  },
   cartIconText: { fontSize: 15 },
+  cartQtyBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: colors.coral,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartQtyText: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: fonts.numeric,
+  },
   info: { padding: 10 },
   name: { fontSize: 12.5, fontWeight: '700', color: colors.navy, lineHeight: 16, minHeight: 32 },
   shop: { fontSize: 10.5, color: colors.muted, marginTop: 3 },

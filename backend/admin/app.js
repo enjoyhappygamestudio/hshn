@@ -2318,7 +2318,7 @@ async function loadAllProductsWithVideos() {
       <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <strong>${esc(p.name)}</strong>
-          <button class="btn btn-sm btn-primary" onclick="showAddVideoDialog('${p.id}','${esc(p.name)}')">+ Thêm video</button>
+          <button class="btn btn-sm btn-primary" onclick="showAddVideoDialog('${p.id}','${esc(p.name)}','${esc(p.category_name || '')}')">+ Thêm video</button>
         </div>
         <div id="videos-${p.id}"><p style="color:var(--text-secondary);font-size:13px">Đang tải video...</p></div>
       </div>
@@ -2346,7 +2346,7 @@ async function loadVideos() {
       <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <strong>${esc(p.name)}</strong>
-          <button class="btn btn-sm btn-primary" onclick="showAddVideoDialog('${p.id}','${esc(p.name)}')">+ Thêm video</button>
+          <button class="btn btn-sm btn-primary" onclick="showAddVideoDialog('${p.id}','${esc(p.name)}','${esc(p.category_name || '')}')">+ Thêm video</button>
         </div>
         <div id="videos-${p.id}"><p style="color:var(--text-secondary);font-size:13px">Đang tải video...</p></div>
       </div>
@@ -2365,9 +2365,80 @@ function validateVideoFile(f) {
   return true;
 }
 
+function validateThumbFile(f) {
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!validTypes.includes(f.type)) { toast('Thumbnail chỉ chấp nhận JPG, PNG, WebP, GIF', 'error'); return false; }
+  if (f.size > 5 * 1024 * 1024) { toast('Thumbnail tối đa 5MB', 'error'); return false; }
+  return true;
+}
+
+async function ensureCategories() {
+  if (state.categories && state.categories.length) return state.categories;
+  try {
+    const cats = await api('GET', '/admin/categories');
+    state.categories = cats.data || [];
+  } catch {
+    state.categories = state.categories || [];
+  }
+  return state.categories;
+}
+
+function categoryOptionsHtml(selected) {
+  const opts = ['<option value="">Chọn danh mục</option>'];
+  (state.categories || []).forEach((c) => {
+    const label = `${c.icon ? c.icon + ' ' : ''}${c.name}`;
+    const sel = selected && selected === c.name ? ' selected' : '';
+    opts.push(`<option value="${esc(c.name)}"${sel}>${esc(label)}</option>`);
+  });
+  if (selected && !(state.categories || []).some((c) => c.name === selected)) {
+    opts.push(`<option value="${esc(selected)}" selected>${esc(selected)} (cũ)</option>`);
+  }
+  return opts.join('');
+}
+
+function bindDropzone(overlay, dropId, inputId, { validate, onFile, previewId }) {
+  const dropzone = overlay.querySelector('#' + dropId);
+  const fileInput = overlay.querySelector('#' + inputId);
+  const openPicker = () => fileInput?.click();
+  dropzone?.addEventListener('click', openPicker);
+  dropzone?.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = 'var(--primary)'; });
+  dropzone?.addEventListener('dragleave', () => { dropzone.style.borderColor = 'var(--border)'; });
+  dropzone?.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation(); dropzone.style.borderColor = 'var(--border)';
+    const f = e.dataTransfer?.files?.[0];
+    if (f && validate(f)) {
+      if (fileInput) {
+        const dt = new DataTransfer();
+        dt.items.add(f);
+        fileInput.files = dt.files;
+      }
+      onFile(f);
+      if (previewId && f.type.startsWith('image/')) {
+        const prev = overlay.querySelector('#' + previewId);
+        if (prev) prev.src = URL.createObjectURL(f);
+      }
+    }
+  });
+  fileInput?.addEventListener('change', () => {
+    const f = fileInput.files?.[0];
+    if (f && validate(f)) {
+      onFile(f);
+      if (previewId && f.type.startsWith('image/')) {
+        const prev = overlay.querySelector('#' + previewId);
+        if (prev) prev.src = URL.createObjectURL(f);
+      }
+    }
+  });
+}
+
 function updateVideoFileInfo(f, overlay, prefix) {
   const el = overlay.querySelector(`#dlg-${prefix}-filename`);
   if (el) el.textContent = `📹 ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`;
+}
+
+function updateThumbFileInfo(f, overlay, prefix) {
+  const el = overlay.querySelector(`#dlg-${prefix}-thumb-filename`);
+  if (el) el.textContent = `🖼 ${f.name} (${(f.size / 1024).toFixed(0)}KB)`;
 }
 
 async function loadProductVideos(productId) {
@@ -2382,11 +2453,14 @@ async function loadProductVideos(productId) {
     }
     el.innerHTML = videos.map((v, i) => `
       <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+        ${v.thumbnail_url
+          ? `<img src="${esc(v.thumbnail_url)}" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border);background:#FAFBFC">`
+          : `<div style="width:56px;height:56px;border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;background:#FAFBFC">🎬</div>`}
         <span style="color:var(--text-secondary);font-size:12px">#${i + 1}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600">${esc(v.title || 'Không có tên')}</div>
           ${v.description ? `<div style="font-size:12px;color:#555;margin:2px 0">${esc(v.description)}</div>` : ''}
-          <div style="font-size:12px;color:var(--text-secondary)">${esc(v.video_category ? `📁 ${v.video_category}` : 'Chưa phân loại')} · Thứ tự: ${v.sort_order || 0}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${esc(v.video_category ? `📁 ${v.video_category}` : 'Chưa phân loại')} · Thứ tự: ${v.sort_order || 0}${v.thumbnail_url ? '' : ' · Chưa có thumbnail'}</div>
           <div style="font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.url)}</div>
         </div>
         <button class="btn btn-sm btn-outline" onclick="window.open('${v.url}','_blank')" style="margin-right:4px">▶ Xem</button>
@@ -2397,120 +2471,126 @@ async function loadProductVideos(productId) {
   } catch { el.innerHTML = '<p style="color:var(--danger);font-size:13px">Lỗi tải video</p>'; }
 }
 
-function showAddVideoDialog(productId, productName) {
-  const overlay = document.createElement('div'); overlay.className = 'dialog-overlay';
-  overlay.innerHTML = `
-    <div class="dialog" style="width:440px">
-      <h3 style="font-size:15px">Thêm video cho ${esc(productName)}</h3>
-      <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0">
-        <div class="form-row" style="gap:8px">
-          <div class="form-group" style="flex:2">
-            <label style="font-size:12px">Tiêu đề <span style="color:var(--danger)">*</span></label>
-            <input type="text" id="dlg-video-title" placeholder="VD: Giới thiệu tôm sú tươi" style="font-size:12px;padding:6px 10px">
-          </div>
-          <div class="form-group" style="flex:1">
-            <label style="font-size:12px">Thứ tự</label>
-            <input type="number" id="dlg-video-order" value="0" min="0" style="font-size:12px;padding:6px 10px">
-          </div>
-        </div>
-        <div class="form-group">
-          <label style="font-size:12px">Mô tả</label>
-          <textarea id="dlg-video-desc" rows="1" placeholder="Mô tả nội dung video..." style="padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%;resize:none;font-family:inherit"></textarea>
-        </div>
-        <div class="form-row" style="gap:8px">
-          <div class="form-group" style="flex:2">
-            <label style="font-size:12px">Video <span style="color:var(--danger)">*</span></label>
-            <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-video-dropzone">
-              <div style="font-size:24px;margin-bottom:2px">🎬</div>
-              <div style="font-size:11px;color:var(--text-secondary)">Kéo thả hoặc <strong style="color:var(--primary)">Chọn file</strong></div>
-              <div style="font-size:10px;color:var(--text-secondary)">MP4, WebM, MOV • Tối đa 50MB</div>
-              <input type="file" accept="video/mp4,video/webm,video/quicktime" id="dlg-video-file" style="display:none">
+function showAddVideoDialog(productId, productName, productCategory) {
+  (async () => {
+    await ensureCategories();
+    const overlay = document.createElement('div'); overlay.className = 'dialog-overlay';
+    overlay.innerHTML = `
+      <div class="dialog" style="width:520px">
+        <h3 style="font-size:15px">Thêm video cho ${esc(productName)}</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0">
+          <div class="form-row" style="gap:8px">
+            <div class="form-group" style="flex:2">
+              <label style="font-size:12px">Tiêu đề <span style="color:var(--danger)">*</span></label>
+              <input type="text" id="dlg-video-title" placeholder="VD: Giới thiệu tôm sú tươi" style="font-size:12px;padding:6px 10px">
             </div>
-            <div id="dlg-video-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
+            <div class="form-group" style="flex:1">
+              <label style="font-size:12px">Thứ tự</label>
+              <input type="number" id="dlg-video-order" value="0" min="0" style="font-size:12px;padding:6px 10px">
+            </div>
           </div>
-          <div class="form-group" style="flex:1">
+          <div class="form-group">
+            <label style="font-size:12px">Mô tả</label>
+            <textarea id="dlg-video-desc" rows="1" placeholder="Mô tả nội dung video..." style="padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%;resize:none;font-family:inherit"></textarea>
+          </div>
+          <div class="form-group">
             <label style="font-size:12px">Danh mục</label>
-            <select id="dlg-video-category" style="font-size:12px;padding:6px 10px">
-              <option value="">Chọn</option>
-              <option value="intro">Giới thiệu</option>
-              <option value="guide">Hướng dẫn</option>
-              <option value="review">Review</option>
-              <option value="fresh">Tươi sống</option>
-              <option value="dry">Hải sản khô</option>
-              <option value="featured">Nổi bật</option>
-              <option value="other">Khác</option>
-            </select>
+            <select id="dlg-video-category" style="font-size:12px;padding:6px 10px">${categoryOptionsHtml(productCategory)}</select>
+          </div>
+          <div class="form-row" style="gap:8px">
+            <div class="form-group" style="flex:1">
+              <label style="font-size:12px">Video <span style="color:var(--danger)">*</span></label>
+              <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-video-dropzone">
+                <div style="font-size:24px;margin-bottom:2px">🎬</div>
+                <div style="font-size:11px;color:var(--text-secondary)">Kéo thả hoặc <strong style="color:var(--primary)">Chọn file</strong></div>
+                <div style="font-size:10px;color:var(--text-secondary)">MP4, WebM, MOV • Tối đa 50MB</div>
+                <input type="file" accept="video/mp4,video/webm,video/quicktime" id="dlg-video-file" style="display:none">
+              </div>
+              <div id="dlg-video-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label style="font-size:12px">Thumbnail</label>
+              <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-video-thumb-dropzone">
+                <img id="dlg-video-thumb-preview" alt="" style="display:none;width:100%;height:72px;object-fit:cover;border-radius:4px;margin-bottom:6px">
+                <div style="font-size:24px;margin-bottom:2px">🖼</div>
+                <div style="font-size:11px;color:var(--text-secondary)">Ảnh bìa video</div>
+                <div style="font-size:10px;color:var(--text-secondary)">JPG, PNG, WebP • Tối đa 5MB</div>
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" id="dlg-video-thumb" style="display:none">
+              </div>
+              <div id="dlg-video-thumb-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
+            </div>
+          </div>
+          <div id="dlg-video-progress-wrap" style="display:none;margin-top:4px">
+            <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+              <div id="dlg-video-progress-bar" style="width:0%;height:100%;background:var(--primary);border-radius:4px;transition:width .3s"></div>
+            </div>
+            <div id="dlg-video-progress-text" style="font-size:11px;color:var(--text-secondary);margin-top:2px">Đang tải lên...</div>
           </div>
         </div>
-        <div id="dlg-video-progress-wrap" style="display:none;margin-top:4px">
-          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
-            <div id="dlg-video-progress-bar" style="width:0%;height:100%;background:var(--primary);border-radius:4px;transition:width .3s"></div>
-          </div>
-          <div id="dlg-video-progress-text" style="font-size:11px;color:var(--text-secondary);margin-top:2px">Đang tải lên...</div>
+        <div class="dialog-actions" style="margin-top:8px">
+          <button class="btn btn-cancel" id="dlg-cancel">Hủy</button>
+          <button class="btn btn-primary" id="dlg-save">Lưu</button>
         </div>
       </div>
-      <div class="dialog-actions" style="margin-top:8px">
-        <button class="btn btn-cancel" id="dlg-cancel">Hủy</button>
-        <button class="btn btn-primary" id="dlg-save">Lưu</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#dlg-cancel')?.addEventListener('click', () => overlay.remove());
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#dlg-cancel')?.addEventListener('click', () => overlay.remove());
 
-  const dropzone = overlay.querySelector('#dlg-video-dropzone');
-  const fileInput = overlay.querySelector('#dlg-video-file');
-  dropzone?.addEventListener('click', () => fileInput?.click());
-  dropzone?.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = 'var(--primary)'; });
-  dropzone?.addEventListener('dragleave', () => { dropzone.style.borderColor = 'var(--border)'; });
-  dropzone?.addEventListener('drop', (e) => {
-    e.preventDefault(); dropzone.style.borderColor = 'var(--border)';
-    const f = e.dataTransfer?.files?.[0];
-    if (f && validateVideoFile(f)) { fileInput.files = e.dataTransfer.files; updateVideoFileInfo(f, overlay, 'video'); }
-  });
-  fileInput?.addEventListener('change', () => {
-    const f = fileInput.files[0];
-    if (f && validateVideoFile(f)) updateVideoFileInfo(f, overlay, 'video');
-  });
+    bindDropzone(overlay, 'dlg-video-dropzone', 'dlg-video-file', {
+      validate: validateVideoFile,
+      onFile: (f) => updateVideoFileInfo(f, overlay, 'video'),
+    });
+    bindDropzone(overlay, 'dlg-video-thumb-dropzone', 'dlg-video-thumb', {
+      validate: validateThumbFile,
+      onFile: (f) => {
+        updateThumbFileInfo(f, overlay, 'video');
+        const prev = overlay.querySelector('#dlg-video-thumb-preview');
+        if (prev) prev.style.display = 'block';
+      },
+      previewId: 'dlg-video-thumb-preview',
+    });
 
-  const addSaveBtn = overlay.querySelector('#dlg-save');
-  const addCancelBtn = overlay.querySelector('#dlg-cancel');
-  addSaveBtn?.addEventListener('click', async () => {
-    const title = $('dlg-video-title')?.value?.trim();
-    const file = $('dlg-video-file')?.files?.[0];
-    const desc = $('dlg-video-desc')?.value?.trim();
-    if (!title) { toast('Vui lòng nhập tiêu đề video', 'error'); return; }
-    if (!file) { toast('Vui lòng tải lên file video', 'error'); return; }
-    (addSaveBtn).disabled = true;
-    (addSaveBtn).textContent = '⏳ Đang tải lên...';
-    if (addCancelBtn) (addCancelBtn).disabled = true;
-    const progressWrap = overlay.querySelector('#dlg-video-progress-wrap');
-    const progressBar = overlay.querySelector('#dlg-video-progress-bar');
-    const progressText = overlay.querySelector('#dlg-video-progress-text');
-    progressWrap.style.display = 'block';
-    try {
-      const data = new FormData();
-      data.append('title', title);
-      if (desc) data.append('description', desc);
-      data.append('video_category', $('dlg-video-category')?.value || '');
-      data.append('sort_order', $('dlg-video-order')?.value || '0');
-      data.append('video', file);
-      await apiUpload('POST', `/admin/products/${productId}/videos/upload`, data, (pct) => {
-        progressBar.style.width = pct + '%';
-        progressText.textContent = `Đang tải lên... ${pct}%`;
-      });
-      progressBar.style.width = '100%';
-      progressText.textContent = '✅ Tải lên hoàn tất';
-      toast('Đã thêm video');
-      setTimeout(() => { overlay.remove(); loadProductVideos(productId); }, 500);
-    } catch (e) {
-      (addSaveBtn).disabled = false;
-      (addSaveBtn).textContent = 'Lưu';
-      if (addCancelBtn) (addCancelBtn).disabled = false;
-      progressWrap.style.display = 'none';
-      toast(e.message, 'error');
-    }
-  });
+    const addSaveBtn = overlay.querySelector('#dlg-save');
+    const addCancelBtn = overlay.querySelector('#dlg-cancel');
+    addSaveBtn?.addEventListener('click', async () => {
+      const title = $('dlg-video-title')?.value?.trim();
+      const file = $('dlg-video-file')?.files?.[0];
+      const thumb = $('dlg-video-thumb')?.files?.[0];
+      const desc = $('dlg-video-desc')?.value?.trim();
+      if (!title) { toast('Vui lòng nhập tiêu đề video', 'error'); return; }
+      if (!file) { toast('Vui lòng tải lên file video', 'error'); return; }
+      (addSaveBtn).disabled = true;
+      (addSaveBtn).textContent = '⏳ Đang tải lên...';
+      if (addCancelBtn) (addCancelBtn).disabled = true;
+      const progressWrap = overlay.querySelector('#dlg-video-progress-wrap');
+      const progressBar = overlay.querySelector('#dlg-video-progress-bar');
+      const progressText = overlay.querySelector('#dlg-video-progress-text');
+      progressWrap.style.display = 'block';
+      try {
+        const data = new FormData();
+        data.append('title', title);
+        if (desc) data.append('description', desc);
+        data.append('video_category', $('dlg-video-category')?.value || '');
+        data.append('sort_order', $('dlg-video-order')?.value || '0');
+        data.append('video', file);
+        if (thumb) data.append('thumbnail', thumb);
+        await apiUpload('POST', `/admin/products/${productId}/videos/upload`, data, (pct) => {
+          progressBar.style.width = pct + '%';
+          progressText.textContent = `Đang tải lên... ${pct}%`;
+        });
+        progressBar.style.width = '100%';
+        progressText.textContent = '✅ Tải lên hoàn tất';
+        toast('Đã thêm video');
+        setTimeout(() => { overlay.remove(); loadProductVideos(productId); }, 500);
+      } catch (e) {
+        (addSaveBtn).disabled = false;
+        (addSaveBtn).textContent = 'Lưu';
+        if (addCancelBtn) (addCancelBtn).disabled = false;
+        progressWrap.style.display = 'none';
+        toast(e.message, 'error');
+      }
+    });
+  })();
 }
 
 async function deleteVideo(videoId, productId) {
@@ -2527,13 +2607,14 @@ async function deleteVideo(videoId, productId) {
 function showEditVideoDialog(videoId, productId) {
   (async () => {
     try {
+      await ensureCategories();
       const data = await api('GET', `/admin/products/${productId}/videos`);
       const video = (data.data || []).find(v => v.id === videoId);
       if (!video) { toast('Không tìm thấy video', 'error'); return; }
 
       const overlay = document.createElement('div'); overlay.className = 'dialog-overlay';
       overlay.innerHTML = `
-        <div class="dialog" style="width:440px">
+        <div class="dialog" style="width:520px">
           <h3 style="font-size:15px">Sửa video</h3>
           <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0">
             <div class="form-row" style="gap:8px">
@@ -2551,27 +2632,30 @@ function showEditVideoDialog(videoId, productId) {
               <textarea id="dlg-edit-desc" rows="1" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;outline:none;width:100%;resize:none;font-family:inherit">${esc(video.description || '')}</textarea>
             </div>
             <div class="form-group">
-              <label style="font-size:12px">Tải lên video mới</label>
-              <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-edit-dropzone">
-                <div style="font-size:24px;margin-bottom:2px">🎬</div>
-                <div style="font-size:11px;color:var(--text-secondary)">Kéo thả hoặc <strong style="color:var(--primary)">Chọn file</strong> để thay thế</div>
-                <div style="font-size:10px;color:var(--text-secondary)">MP4, WebM, MOV • Tối đa 50MB</div>
-                <input type="file" accept="video/mp4,video/webm,video/quicktime" id="dlg-edit-file" style="display:none">
-              </div>
-              <div id="dlg-edit-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
-            </div>
-            <div class="form-group" style="flex:1">
               <label style="font-size:12px">Danh mục</label>
-              <select id="dlg-edit-category" style="font-size:12px;padding:6px 10px">
-                <option value="">Chọn</option>
-                <option value="intro" ${video.video_category === 'intro' ? 'selected':''}>Giới thiệu</option>
-                <option value="guide" ${video.video_category === 'guide' ? 'selected':''}>Hướng dẫn</option>
-                <option value="review" ${video.video_category === 'review' ? 'selected':''}>Review</option>
-                <option value="fresh" ${video.video_category === 'fresh' ? 'selected':''}>Tươi sống</option>
-                <option value="dry" ${video.video_category === 'dry' ? 'selected':''}>Hải sản khô</option>
-                <option value="featured" ${video.video_category === 'featured' ? 'selected':''}>Nổi bật</option>
-                <option value="other" ${video.video_category === 'other' ? 'selected':''}>Khác</option>
-              </select>
+              <select id="dlg-edit-category" style="font-size:12px;padding:6px 10px">${categoryOptionsHtml(video.video_category || '')}</select>
+            </div>
+            <div class="form-row" style="gap:8px">
+              <div class="form-group" style="flex:1">
+                <label style="font-size:12px">Tải lên video mới</label>
+                <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-edit-dropzone">
+                  <div style="font-size:24px;margin-bottom:2px">🎬</div>
+                  <div style="font-size:11px;color:var(--text-secondary)">Kéo thả hoặc <strong style="color:var(--primary)">Chọn file</strong> để thay thế</div>
+                  <div style="font-size:10px;color:var(--text-secondary)">MP4, WebM, MOV • Tối đa 50MB</div>
+                  <input type="file" accept="video/mp4,video/webm,video/quicktime" id="dlg-edit-file" style="display:none">
+                </div>
+                <div id="dlg-edit-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
+              </div>
+              <div class="form-group" style="flex:1">
+                <label style="font-size:12px">Thumbnail</label>
+                <div style="border:2px dashed var(--border);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:#fafafa" id="dlg-edit-thumb-dropzone">
+                  <img id="dlg-edit-thumb-preview" src="${esc(video.thumbnail_url || '')}" alt="" style="${video.thumbnail_url ? '' : 'display:none;'}width:100%;height:72px;object-fit:cover;border-radius:4px;margin-bottom:6px">
+                  <div style="font-size:11px;color:var(--text-secondary)">${video.thumbnail_url ? 'Chọn ảnh mới để thay' : 'Chưa có ảnh bìa'}</div>
+                  <div style="font-size:10px;color:var(--text-secondary)">JPG, PNG, WebP • Tối đa 5MB</div>
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" id="dlg-edit-thumb" style="display:none">
+                </div>
+                <div id="dlg-edit-thumb-filename" style="font-size:11px;color:var(--text-secondary);margin-top:2px"></div>
+              </div>
             </div>
             <div id="dlg-edit-progress-wrap" style="display:none;margin-top:4px">
               <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
@@ -2588,20 +2672,21 @@ function showEditVideoDialog(videoId, productId) {
       `;
       document.body.appendChild(overlay);
 
-      const dropzone = overlay.querySelector('#dlg-edit-dropzone');
-      const fileInput = overlay.querySelector('#dlg-edit-file');
       let newFile = null;
-      dropzone?.addEventListener('click', () => fileInput?.click());
-      dropzone?.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.style.borderColor = 'var(--primary)'; });
-      dropzone?.addEventListener('dragleave', () => { dropzone.style.borderColor = 'var(--border)'; });
-      dropzone?.addEventListener('drop', (e) => {
-        e.preventDefault(); e.stopPropagation(); dropzone.style.borderColor = 'var(--border)';
-        const f = e.dataTransfer?.files?.[0];
-        if (f && validateVideoFile(f)) { newFile = f; updateVideoFileInfo(f, overlay, 'edit'); }
+      let newThumb = null;
+      bindDropzone(overlay, 'dlg-edit-dropzone', 'dlg-edit-file', {
+        validate: validateVideoFile,
+        onFile: (f) => { newFile = f; updateVideoFileInfo(f, overlay, 'edit'); },
       });
-      fileInput?.addEventListener('change', () => {
-        const f = fileInput.files[0];
-        if (f && validateVideoFile(f)) { newFile = f; updateVideoFileInfo(f, overlay, 'edit'); }
+      bindDropzone(overlay, 'dlg-edit-thumb-dropzone', 'dlg-edit-thumb', {
+        validate: validateThumbFile,
+        onFile: (f) => {
+          newThumb = f;
+          updateThumbFileInfo(f, overlay, 'edit');
+          const prev = overlay.querySelector('#dlg-edit-thumb-preview');
+          if (prev) prev.style.display = 'block';
+        },
+        previewId: 'dlg-edit-thumb-preview',
       });
 
       overlay.querySelector('#dlg-cancel')?.addEventListener('click', () => overlay.remove());
@@ -2617,13 +2702,14 @@ function showEditVideoDialog(videoId, productId) {
         const progressBar = overlay.querySelector('#dlg-edit-progress-bar');
         const progressText = overlay.querySelector('#dlg-edit-progress-text');
         try {
-          const fd = new FormData();
-          fd.append('title', title);
-          fd.append('description', $('dlg-edit-desc')?.value?.trim() || '');
-          fd.append('video_category', $('dlg-edit-category')?.value || '');
-          fd.append('sort_order', $('dlg-edit-order')?.value || '0');
-          if (newFile) {
-            fd.append('video', newFile);
+          if (newFile || newThumb) {
+            const fd = new FormData();
+            fd.append('title', title);
+            fd.append('description', $('dlg-edit-desc')?.value?.trim() || '');
+            fd.append('video_category', $('dlg-edit-category')?.value || '');
+            fd.append('sort_order', $('dlg-edit-order')?.value || '0');
+            if (newFile) fd.append('video', newFile);
+            if (newThumb) fd.append('thumbnail', newThumb);
             progressWrap.style.display = 'block';
             await apiUpload('PUT', `/admin/products/videos/${videoId}/upload`, fd, (pct) => {
               progressBar.style.width = pct + '%';

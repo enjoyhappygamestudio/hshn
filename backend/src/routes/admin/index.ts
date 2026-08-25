@@ -8,25 +8,48 @@ import { cancelShipOrder } from '../../services/carrier';
 import { uploadBuffer, safeFilename, keyFromUrl, deleteObject } from '../../services/storage';
 import { runBackup } from '../../services/backup';
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['video/mp4', 'video/webm', 'video/quicktime', 'application/octet-stream'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Chỉ hỗ trợ MP4, WebM, MOV'));
-  },
-});
+const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime', 'application/octet-stream'];
 
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
+    if (IMAGE_MIMES.includes(file.mimetype)) cb(null, true);
     else cb(new Error('Chỉ hỗ trợ JPG, PNG, WebP, GIF'));
   },
 });
+
+const videoMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.fieldname === 'thumbnail') {
+      if (IMAGE_MIMES.includes(file.mimetype)) cb(null, true);
+      else cb(new Error('Thumbnail chỉ hỗ trợ JPG, PNG, WebP, GIF'));
+      return;
+    }
+    if (VIDEO_MIMES.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Chỉ hỗ trợ MP4, WebM, MOV'));
+  },
+});
+
+function mediaFiles(req: Request): { video?: Express.Multer.File; thumbnail?: Express.Multer.File } {
+  const files = req.files as { [field: string]: Express.Multer.File[] } | undefined;
+  return {
+    video: files?.video?.[0],
+    thumbnail: files?.thumbnail?.[0],
+  };
+}
+
+async function storeThumbnail(file: Express.Multer.File): Promise<string> {
+  return uploadBuffer({
+    bucket: 'media',
+    key: `images/${Date.now()}-${safeFilename(file.originalname)}`,
+    body: file.buffer,
+    contentType: file.mimetype || 'image/jpeg',
+  });
+}
 
 const documentUpload = multer({
   storage: multer.memoryStorage(),
@@ -681,21 +704,28 @@ router.post('/products/:id/videos', authenticate, requireAdmin, async (req: Auth
   }
 });
 
-router.post('/products/:id/videos/upload', authenticate, requireAdmin, upload.single('video'), async (req: AuthRequest, res: Response) => {
+router.post(
+  '/products/:id/videos/upload',
+  authenticate,
+  requireAdmin,
+  videoMediaUpload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]),
+  async (req: AuthRequest, res: Response) => {
   try {
-    if (!req.file) return res.status(400).json(error('Vui lòng chọn file video'));
+    const { video, thumbnail } = mediaFiles(req);
+    if (!video) return res.status(400).json(error('Vui lòng chọn file video'));
     const fileUrl = await uploadBuffer({
       bucket: 'media',
-      key: `videos/${Date.now()}-${safeFilename(req.file.originalname)}`,
-      body: req.file.buffer,
-      contentType: req.file.mimetype || 'video/mp4',
+      key: `videos/${Date.now()}-${safeFilename(video.originalname)}`,
+      body: video.buffer,
+      contentType: video.mimetype || 'video/mp4',
     });
+    const thumbUrl = thumbnail ? await storeThumbnail(thumbnail) : null;
     const { title, description, video_category, sort_order } = req.body;
     const result = await query(
       `INSERT INTO product_videos (product_id, url, thumbnail_url, title, description, video_category, duration, sort_order, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'ready')
        RETURNING id, url, thumbnail_url, title, description, video_category, duration, sort_order, status`,
-      [req.params.id, fileUrl, null, title || null, description || null, video_category || null, 0, sort_order ?? 0],
+      [req.params.id, fileUrl, thumbUrl, title || null, description || null, video_category || null, 0, sort_order ?? 0],
     );
     res.status(201).json(success(result.rows[0]));
   } catch (err: any) {
@@ -705,17 +735,17 @@ router.post('/products/:id/videos/upload', authenticate, requireAdmin, upload.si
 
 router.put('/products/videos/:id', authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const { title, description, video_category, sort_order, url } = req.body;
+    const { title, description, video_category, sort_order, url, thumbnail_url } = req.body;
     const result = await query(
       `UPDATE product_videos SET
         title = COALESCE($1, title),
         description = COALESCE($2, description),
         video_category = COALESCE($3, video_category),
         sort_order = COALESCE($4, sort_order),
-        url = COALESCE($5, url)
-       WHERE id = $6 RETURNING *`,
-
-      [title ?? null, description ?? null, video_category ?? null, sort_order ?? null, url ?? null, req.params.id],
+        url = COALESCE($5, url),
+        thumbnail_url = COALESCE($6, thumbnail_url)
+       WHERE id = $7 RETURNING *`,
+      [title ?? null, description ?? null, video_category ?? null, sort_order ?? null, url ?? null, thumbnail_url ?? null, req.params.id],
     );
     if (result.rows.length === 0) return res.status(404).json(error('Không tìm thấy video'));
     res.json(success(result.rows[0]));
@@ -724,35 +754,53 @@ router.put('/products/videos/:id', authenticate, requireAdmin, async (req: AuthR
   }
 });
 
-router.put('/products/videos/:id/upload', authenticate, requireAdmin, upload.single('video'), async (req: AuthRequest, res: Response) => {
+router.put(
+  '/products/videos/:id/upload',
+  authenticate,
+  requireAdmin,
+  videoMediaUpload.fields([{ name: 'video', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]),
+  async (req: AuthRequest, res: Response) => {
   try {
     const { title, description, video_category, sort_order } = req.body;
+    const { video, thumbnail } = mediaFiles(req);
+    const old = await query('SELECT url, thumbnail_url FROM product_videos WHERE id = $1', [req.params.id]);
+    if (old.rows.length === 0) return res.status(404).json(error('Không tìm thấy video'));
+
     let fileUrl: string | null = null;
-    let oldUrl: string | null = null;
-    if (req.file) {
-      const old = await query('SELECT url FROM product_videos WHERE id = $1', [req.params.id]);
-      oldUrl = old.rows[0]?.url || null;
+    let thumbUrl: string | null = null;
+    if (video) {
       fileUrl = await uploadBuffer({
         bucket: 'media',
-        key: `videos/${Date.now()}-${safeFilename(req.file.originalname)}`,
-        body: req.file.buffer,
-        contentType: req.file.mimetype || 'video/mp4',
+        key: `videos/${Date.now()}-${safeFilename(video.originalname)}`,
+        body: video.buffer,
+        contentType: video.mimetype || 'video/mp4',
       });
     }
+    if (thumbnail) {
+      thumbUrl = await storeThumbnail(thumbnail);
+    }
+
     const result = await query(
       `UPDATE product_videos SET
         url = COALESCE($1, url),
-        title = COALESCE($2, title),
-        description = COALESCE($3, description),
-        video_category = COALESCE($4, video_category),
-        sort_order = COALESCE($5, sort_order)
-       WHERE id = $6 RETURNING *`,
-      [fileUrl, title ?? null, description ?? null, video_category ?? null,
+        thumbnail_url = COALESCE($2, thumbnail_url),
+        title = COALESCE($3, title),
+        description = COALESCE($4, description),
+        video_category = COALESCE($5, video_category),
+        sort_order = COALESCE($6, sort_order)
+       WHERE id = $7 RETURNING *`,
+      [fileUrl, thumbUrl, title ?? null, description ?? null, video_category ?? null,
        sort_order != null ? parseInt(sort_order as string, 10) : null, req.params.id],
     );
-    if (result.rows.length === 0) return res.status(404).json(error('Không tìm thấy video'));
+
+    const oldUrl = old.rows[0]?.url || null;
+    const oldThumb = old.rows[0]?.thumbnail_url || null;
     if (fileUrl && oldUrl && oldUrl !== fileUrl) {
       const key = keyFromUrl(oldUrl);
+      if (key) await deleteObject('media', key);
+    }
+    if (thumbUrl && oldThumb && oldThumb !== thumbUrl) {
+      const key = keyFromUrl(oldThumb);
       if (key) await deleteObject('media', key);
     }
     res.json(success(result.rows[0]));
@@ -763,11 +811,11 @@ router.put('/products/videos/:id/upload', authenticate, requireAdmin, upload.sin
 
 router.delete('/products/videos/:id', authenticate, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const old = await query('SELECT url FROM product_videos WHERE id = $1', [req.params.id]);
-    const oldUrl = old.rows[0]?.url || null;
+    const old = await query('SELECT url, thumbnail_url FROM product_videos WHERE id = $1', [req.params.id]);
     await query('DELETE FROM product_videos WHERE id = $1', [req.params.id]);
-    if (oldUrl) {
-      const key = keyFromUrl(oldUrl);
+    for (const url of [old.rows[0]?.url, old.rows[0]?.thumbnail_url]) {
+      if (!url) continue;
+      const key = keyFromUrl(url);
       if (key) await deleteObject('media', key);
     }
     res.json(success({ message: 'Đã xóa video' }));
