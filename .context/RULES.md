@@ -18,6 +18,8 @@
 | C-012 | `rules/code/voucher-card.md` | Component Voucher Card chuẩn |
 | C-013 | `rules/code/admin-crud.md` | Pattern CRUD cho admin |
 | C-014 | `rules/code/delivery-mode.md` | Pattern thời gian giao hàng |
+| C-015 | `rules/code/shared-infra.md` | Postgres/Redis dùng chung NOXH — cấm dựng riêng |
+| C-016 | `rules/code/cong-port.md` | Phân bổ cổng workspace — cấm trùng giữa dự án |
 
 ## Test rules
 
@@ -38,6 +40,7 @@
 | D-003 | `rules/doc/spec-update.md` | Cập nhật spec khi thay đổi |
 | D-004 | `rules/doc/changelog.md` | Ghi changelog |
 | D-005 | `rules/doc/code-comments.md` | Comment code |
+| D-006 | `rules/doc/build-van-hanh.md` | Build/README 3 chế độ — mẫu AppThueNha |
 
 ## Investigate rules
 

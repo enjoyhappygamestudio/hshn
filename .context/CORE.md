@@ -33,6 +33,9 @@ Không tự ý sửa/xóa dữ liệu người dùng. Mọi thao tác quan trọ
 ### P6. Bảo mật — Security
 Không hardcode secret, API key, token. Dùng biến môi trường. Xác thực đầu vào. Mã hóa dữ liệu nhạy cảm.
 
+### P6b. Hạ tầng dùng chung — Shared Postgres/Redis
+Postgres + Redis dùng chung cụm NOXH (`localhost:55432` / `56379`, Redis index `/1`). Không dựng container DB/Redis riêng. Chi tiết: `rules/code/shared-infra.md`.
+
 ### P7. Chịu lỗi offline — Offline resilience
 App phải xử lý graceful khi mất kết nối: cache dữ liệu, thông báo rõ ràng, nút thử lại. Giỏ hàng giữ nguyên khi phiên hết hạn.
 

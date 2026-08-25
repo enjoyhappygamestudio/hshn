@@ -19,7 +19,7 @@ import { colors, radii, commonStyles } from '../constants/theme';
 import { formatMoney } from '../utils/format';
 import { Product, ProductVideo } from '../types';
 import { fetchProductDetail, fetchProductVideos } from '../services/api';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 import { BackButton } from '../components/BackButton';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -62,17 +62,20 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
 
   const variant = variants.length > 0
     ? variants[variantIndex]
-    : { label: '', price: product?.price || 0, unit: product?.unit || '/kg', stock: 0 };
-  const overStock = quantity >= (variant.stock || 0);
+    : { label: '', price: product?.price || 0, unit: product?.unit || '/kg', stock: product?.stock ?? 0 };
+  const stock = Math.max(0, Number(variant.stock ?? product?.stock ?? 0));
+  const outOfStock = stock <= 0;
   const price = variant.price || product?.price || 0;
   const oldPrice = product?.oldPrice;
+  const lineTotal = price * quantity;
+  const oldLineTotal = oldPrice ? oldPrice * quantity : undefined;
 
   const handleAddToCart = useCallback(() => {
-    if (!product) return;
-    useCartStore.getState().addItem(product, variant.label || '1 phần', quantity);
+    if (!product || outOfStock) return;
+    useCartStore.getState().addItem(product, variant.label || '1 phần', quantity, undefined, price);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 1800);
-  }, [product, variant, quantity]);
+  }, [product, variant, quantity, outOfStock, price]);
 
   const handleBuyNow = useCallback(() => {
     handleAddToCart();
@@ -109,7 +112,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             <View style={{ width: SCREEN_W, height: 260 }}>
               <Video
                 ref={videoRef}
-                source={{ uri: videos[videoIndex]?.url ? (videos[videoIndex].url.startsWith('http') ? videos[videoIndex].url : API_BASE_URL.replace('/api', '') + videos[videoIndex].url) : '' }}
+                source={{ uri: mediaUrl(videos[videoIndex]?.url) || '' }}
                 style={{ width: SCREEN_W, height: 260 }}
                 resizeMode={ResizeMode.CONTAIN}
                 isLooping
@@ -122,7 +125,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                   const v = videos[videoIndex];
                   const mappedVideo = {
                       id: v.id,
-                      url: v.url.startsWith('http') ? v.url : API_BASE_URL.replace('/api', '') + v.url,
+                      url: mediaUrl(v.url) || '',
                       thumbnail_url: v.thumbnail_url,
                       duration: v.duration,
                       title: v.title || product?.name || '',
@@ -140,7 +143,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                   const allMapped = videos.map((vv) => ({
                       ...mappedVideo,
                       id: vv.id,
-                      url: vv.url.startsWith('http') ? vv.url : API_BASE_URL.replace('/api', '') + vv.url,
+                      url: mediaUrl(vv.url) || '',
                       thumbnail_url: vv.thumbnail_url,
                       duration: vv.duration,
                       title: vv.title || product?.name || '',
@@ -158,7 +161,8 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 <TouchableOpacity
                   style={styles.videoOverlay}
                   onPress={() => {
-                    useCartStore.getState().addItem(product, variant.label || '1 phần', 1);
+                    if (!product || outOfStock) return;
+                    useCartStore.getState().addItem(product, variant.label || '1 phần', 1, undefined, price);
                     setShowToast(true);
                     setTimeout(() => setShowToast(false), 1800);
                   }}
@@ -209,13 +213,24 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           </View>
 
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatMoney(price)}</Text>
-            <Text style={styles.priceUnit}>{variant.unit || product?.unit || '/kg'}</Text>
+            <Text style={styles.price}>{formatMoney(lineTotal)}</Text>
+            {oldLineTotal ? (
+              <Text style={styles.oldPrice}>{formatMoney(oldLineTotal)}</Text>
+            ) : null}
           </View>
+          <Text style={styles.priceMeta}>
+            {formatMoney(price)}{variant.unit || product?.unit || '/kg'}
+            {quantity > 1 ? `  ×  ${quantity}` : ''}
+          </Text>
+          <Text style={[styles.stockLine, outOfStock && styles.stockLineEmpty]}>
+            {outOfStock
+              ? 'Hết hàng'
+              : `Còn ${stock} sản phẩm trong kho`}
+          </Text>
 
           {variants.length > 0 && (
             <>
-              <Text style={styles.fieldLabel}>Chọn quy cách</Text>
+              <Text style={styles.fieldLabel}>Phân Loại</Text>
               <View style={styles.variantRow}>
                 {variants.map((v, i) => (
                   <TouchableOpacity
@@ -242,6 +257,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     >
                       {formatMoney(v.price)}
                     </Text>
+                    <Text style={styles.variantStock}>
+                      {Number(v.stock ?? 0) > 0 ? `Còn ${v.stock}` : 'Hết hàng'}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -249,11 +267,31 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
           )}
 
           <Text style={styles.fieldLabel}>Số lượng</Text>
-          <QuantityStepper
-            value={quantity}
-            stock={variant.stock || 999}
-            onChange={setQuantity}
-          />
+          {outOfStock ? (
+            <Text style={styles.stockHint}>Hiện không thể đặt phân loại này.</Text>
+          ) : (
+            <QuantityStepper
+              value={quantity}
+              stock={stock}
+              onChange={setQuantity}
+            />
+          )}
+          {!outOfStock && (
+            <View style={styles.lineBox}>
+              <View style={styles.lineRow}>
+                <Text style={styles.lineLabel}>Đơn giá</Text>
+                <Text style={styles.lineValue}>{formatMoney(price)}</Text>
+              </View>
+              <View style={styles.lineRow}>
+                <Text style={styles.lineLabel}>Số lượng</Text>
+                <Text style={styles.lineValue}>×{quantity}</Text>
+              </View>
+              <View style={[styles.lineRow, styles.lineTotalRow]}>
+                <Text style={styles.lineTotalLabel}>Thành tiền</Text>
+                <Text style={styles.lineTotalValue}>{formatMoney(lineTotal)}</Text>
+              </View>
+            </View>
+          )}
 
           <Text style={styles.fieldLabel}>Mô tả sản phẩm</Text>
           <Text style={styles.desc}>
@@ -266,13 +304,16 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       <ActionBar
         secondaryLabel="Thêm vào giỏ"
         secondaryAction={handleAddToCart}
-        primaryLabel="Mua ngay"
+        primaryLabel={outOfStock ? 'Hết hàng' : `Mua ngay · ${formatMoney(lineTotal)}`}
         primaryAction={handleBuyNow}
+        primaryDisabled={outOfStock}
       />
 
       {showToast && (
         <View style={styles.toast}>
-          <Text style={styles.toastText}>Đã thêm vào giỏ hàng</Text>
+          <Text style={styles.toastText}>
+            Đã thêm {quantity} × {formatMoney(price)} = {formatMoney(lineTotal)}
+          </Text>
         </View>
       )}
     </SafeAreaView>
@@ -334,7 +375,34 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   price: { fontFamily: 'Inter', fontWeight: '800', fontSize: 23, color: colors.coral },
-  priceUnit: { fontSize: 12.5, color: colors.muted },
+  oldPrice: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: colors.muted,
+    textDecorationLine: 'line-through',
+  },
+  priceMeta: { fontSize: 12.5, color: colors.muted, marginBottom: 6 },
+  lineBox: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.mint,
+    gap: 8,
+  },
+  lineRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  lineLabel: { fontSize: 12.5, color: colors.muted },
+  lineValue: { fontSize: 13, fontWeight: '700', color: colors.navy },
+  lineTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(7,140,134,0.2)',
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  lineTotalLabel: { fontSize: 13, fontWeight: '800', color: colors.navy },
+  lineTotalValue: { fontFamily: 'Inter', fontWeight: '800', fontSize: 16, color: colors.coral },
+  stockLine: { fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 4 },
+  stockLineEmpty: { color: colors.danger },
+  stockHint: { fontSize: 12, color: colors.danger, marginTop: 2 },
   fieldLabel: { fontSize: 13, fontWeight: '800', color: colors.navy, marginTop: 18, marginBottom: 10 },
   variantRow: { flexDirection: 'row', gap: 10 },
   variant: {
@@ -356,6 +424,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   variantPriceSel: { color: colors.primary },
+  variantStock: { fontSize: 11, color: colors.muted, marginTop: 2 },
   desc: { fontSize: 13, lineHeight: 20, color: '#3d5560', marginTop: 6 },
   toast: {
     position: 'absolute',

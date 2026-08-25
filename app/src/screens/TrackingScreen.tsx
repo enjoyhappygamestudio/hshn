@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { LEAFLET_HEAD, WEBVIEW_MAP_PROPS, leafletTileInit } from '../utils/leafletMap';
 import { useCartStore } from '../stores/cartStore';
 import { useCheckoutStore } from '../stores/checkoutStore';
 import { colors, radii, commonStyles } from '../constants/theme';
@@ -108,10 +109,7 @@ function buildMapHtml(pickup?: MapPoint, delivery?: MapPoint, route?: TrackPoint
   return `<!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+${LEAFLET_HEAD}
 <style>
   html, body, #map { height: 100%; margin: 0; padding: 0; }
   .shop-icon, .home-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 17px; background: #fff; border: 2px solid #16a085; box-shadow: 0 2px 6px rgba(0,0,0,.25); font-size: 17px; }
@@ -123,8 +121,7 @@ function buildMapHtml(pickup?: MapPoint, delivery?: MapPoint, route?: TrackPoint
 <body>
 <div id="map"></div>
 <script>
-var map = L.map('map').setView([21.0285, 105.852], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 18 }).addTo(map);
+${leafletTileInit(21.0285, 105.852, 13)}
 
 var shopMarker = null, homeMarker = null, routeLine = null;
 var driverMarker = null, driverChip = null;
@@ -429,9 +426,8 @@ export const TrackingScreen: React.FC<TrackingScreenProps> = ({ navigation, rout
                 ref={webviewRef}
                 source={{ html: mapHtml }}
                 style={styles.map}
-                originWhitelist={['*']}
-                javaScriptEnabled
                 scrollEnabled={false}
+                {...WEBVIEW_MAP_PROPS}
                 onLoadEnd={() => {
                   const driver = computeDriver(track);
                   if (driver) {

@@ -24,7 +24,7 @@ import { Feather } from '@expo/vector-icons';
 import { useCartStore } from '../stores/cartStore';
 import { useAuthStore } from '../stores/authStore';
 import { colors, fonts } from '../constants/theme';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 import { formatMoney } from '../utils/format';
 import { FeaturedVideo, VideoComment } from '../types';
 import { fetchVideoComments, postVideoComment, getVideoLikeStatus, toggleVideoLike, recordVideoView, updateVideoComment, deleteVideoComment, fetchProductDetail } from '../services/api';
@@ -58,9 +58,8 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
   const customerId = customer?.id;
   const customerName = customer?.name || 'Khách';
 
-  const API_BASE = API_BASE_URL.replace('/api', '');
-  const vidUrl = video.url.startsWith('http') ? video.url : API_BASE + video.url;
-  const thumbUrl = video.thumbnail_url?.startsWith('http') ? video.thumbnail_url : video.thumbnail_url ? API_BASE + video.thumbnail_url : null;
+  const vidUrl = mediaUrl(video.url) || '';
+  const thumbUrl = mediaUrl(video.thumbnail_url);
 
   const indexRef = useRef(currentIndex);
   indexRef.current = currentIndex;

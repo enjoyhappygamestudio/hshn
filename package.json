@@ -1,0 +1,14 @@
+{
+  "name": "haisanhanoi",
+  "private": true,
+  "description": "Hải Sản Hà Nội — API Docker + Expo mobile",
+  "scripts": {
+    "start:all": "bash scripts/start-all.sh",
+    "start:infra": "bash scripts/start-infra.sh",
+    "start:expo": "bash scripts/start-expo.sh",
+    "stop": "bash scripts/stop.sh",
+    "stop:all": "bash scripts/stop.sh all",
+    "status": "bash scripts/status.sh",
+    "dev:expo": "npm --prefix app start"
+  }
+}

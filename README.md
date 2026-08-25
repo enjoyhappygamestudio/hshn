@@ -59,7 +59,35 @@
 
 ## Chạy
 
-### Backend (Docker) — dùng chung Postgres/Redis với NOXH
+Chuẩn build workspace (3 chế độ): mẫu [`AppThueNha/README.md`](../AppThueNha/README.md) · rule [`.context/rules/doc/build-van-hanh.md`](.context/rules/doc/build-van-hanh.md).
+
+| Thành phần | Local | Production (sau Caddy) |
+|---|---|---|
+| API | http://localhost:**3100** | *(Caddy — chưa mô tả đầy đủ trong README này)* |
+| Admin | http://localhost:**3101** | *(chưa)* |
+| Expo | Metro :**8002** | — |
+| Postgres (NOXH) | `localhost:55432` → DB `haisanhanoi` | `noxh-postgres:5432` |
+| Redis (NOXH) | `localhost:56379` / **/1** | `noxh-redis:6379/1` |
+
+### 1. Local — dev (npm / pnpm trên host)
+
+Yêu cầu: Docker Desktop + repo **NOXH** cạnh thư mục này (Postgres/Redis dùng chung).
+
+```bash
+cd /path/to/VPS/HaiSanHaNoi
+npm run start:all              # NOXH infra + API :3100 + Admin :3101 + Expo :8002
+npm run start:all -- --no-expo # không bật Expo
+npm run status
+npm run stop:all
+```
+
+Lần đầu cần init DB:
+
+```bash
+cd backend && ./scripts/init-shared-db.sh
+```
+
+### 2. Local — Docker apps
 
 Yêu cầu: NOXH infra đang chạy (`noxh-postgres` :55432, `noxh-redis` :56379).
 
@@ -76,14 +104,21 @@ docker compose logs -f api
 | Admin (nginx) | **3101** |
 
 ### Mobile App (Expo)
+
+Metro cố định cổng **8002** (tránh trùng NOXH `:8001`, AppThuêNhà `:8003`).
+
 ```bash
-cd app
-npm start                     # Mở Expo dev server
-npx expo start --ios          # Chạy trên iOS simulator
-npx expo start --android      # Chạy trên Android emulator
+npm run start:expo            # từ gốc repo
+# hoặc:
+cd app && npm start           # expo start --port 8002
 ```
 
-### Build Production
+QR / URL dạng `exp://<IP-LAN>:8002`.
+
+### 3. Production — VPS + Caddy
+
+**Chưa hỗ trợ đầy đủ trong README.** Kỳ vọng: Caddy trên host terminate TLS → proxy API/Admin; không dựng Postgres/Redis riêng. Build app native:
+
 ```bash
 cd app
 npx expo run:ios --configuration Release

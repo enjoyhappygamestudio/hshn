@@ -17,7 +17,7 @@ import { Order } from '../types';
 import { fetchOrders } from '../services/api';
 import { formatMoney } from '../utils/format';
 import { BottomNav } from '../components/BottomNav';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 
 interface OrderListScreenProps {
   navigation: any;
@@ -106,7 +106,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
           const img = oi.image;
           const isData = img?.startsWith('data:');
           const isHttp = img?.startsWith('http');
-          const imgUrl = isData ? img : isHttp ? img : img ? API_BASE_URL.replace('/api', '') + img : null;
+          const imgUrl = isData ? img : isHttp ? img : mediaUrl(img);
           return (
             <View key={i} style={styles.itemThumb}>
               {imgUrl ? (

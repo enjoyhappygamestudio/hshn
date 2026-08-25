@@ -13,6 +13,9 @@ Xây dựng ứng dụng di động (iOS & Android) đặt hải sản và trang
 | Loại | Mobile app (React Native / Flutter) + Admin Web |
 | Ngôn ngữ UI | Tiếng Việt |
 | Design System | Xem `.context/` |
+| Hạ tầng DB | Postgres/Redis dùng chung NOXH — `rules/code/shared-infra.md` |
+| Cổng | Không trùng dự án khác — `rules/code/cong-port.md` (API **3100**, Admin **3101**, Expo **8002**) |
+| Build / README | 3 chế độ (pnpm / Docker apps / Caddy) — `rules/doc/build-van-hanh.md` (mẫu AppThueNha) |
 
 ## Cấu trúc Hệ điều hành ngữ cảnh
 

@@ -160,6 +160,7 @@ function mapProduct(p: any): Product {
     distance: p.distance || '',
     isFresh: p.is_fresh !== false,
     isOutOfStock: p.stock === 0 || p.is_out_of_stock,
+    stock: Number(p.stock ?? 0),
     imageBg: p.image_bg || '#EAF8F7',
     emoji: p.emoji || '🦐',
     description: p.description || undefined,
@@ -173,7 +174,7 @@ function mapProduct(p: any): Product {
       label: v.label,
       price: v.price,
       unit: v.unit,
-      stock: v.stock,
+      stock: Number(v.stock ?? 0),
     })) : undefined,
   };
 }

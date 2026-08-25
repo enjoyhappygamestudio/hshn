@@ -24,24 +24,22 @@ Khởi tạo DB lần đầu (từ `backend/`):
 ./scripts/init-shared-db.sh
 ```
 
-Cloudflare tunnel trỏ vào **admin (port 3101)** — nginx proxy `/api` & `/uploads` sang api, nên 1 URL dùng được cho cả web admin lẫn API.
+## Caddy (HTTPS trên VPS)
 
-## Web Admin + API
+| Host | Upstream |
+|---|---|
+| `apiapp.haisanbay.com` | `127.0.0.1:3100` (API) |
 
-- **Web Admin:** https://crest-hypothetical-overnight-trying.trycloudflare.com/admin/
-- **API:** https://crest-hypothetical-overnight-trying.trycloudflare.com/api
+File mẫu: `backend/docker/caddy/Caddyfile` — ghép vào `/etc/caddy/Caddyfile` rồi `sudo systemctl reload caddy`.
 
-## App (Expo)
+Admin (`3101`) chỉ nội bộ / SSH tunnel — chưa gắn domain Caddy.
 
-- **Mở bằng Expo Go:** `exp://wgkqz6s-anonymous-8082.exp.direct`
+## API
 
-## API cho App
-
-- **App gọi API qua:** https://crest-hypothetical-overnight-trying.trycloudflare.com/api
+- **API:** https://apiapp.haisanbay.com/api
+- **Health:** https://apiapp.haisanbay.com/api/health
 
 ## Ghi chú
 
-- URL Cloudflare/Expo tunnel là **ngẫu nhiên**, thay đổi mỗi lần restart tunnel.
-- `API_BASE_URL` trong `app/src/constants/config.ts` đã trỏ tới URL Cloudflare API ở trên.
-- Log tunnel: `/tmp/hshn_tunnel.log` (PID 12023); log Expo: `/tmp/hshn_expo.log` (PID 28726).
-- Port app HSHN (`3100` API, `3101` admin) và NOXH (`3000–3003`, `8081`, `55432`, `56379`) không trùng nhau.
+- Port app HSHN (`3100` API, `3101` admin, Expo Metro **8002**) và NOXH (`3000–3003`, mobile web `8081`, Expo Metro **8001**, `55432`, `56379`), AppThuêNhà (Expo Metro **8003**) không trùng nhau; ShopManager **3400**, fanpage **3500** (tránh NOXH 3000/3001).
+- UFW chỉ mở `22` / `80` / `443`; không public `3100`/`3101`.

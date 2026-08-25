@@ -1,0 +1,16 @@
+# Hải Sản Hà Nội — HTTPS qua Caddy trên host (cùng cách NOXH)
+#
+# Trên VPS đã có Caddy cho NOXH: GHÉP block bên dưới vào /etc/caddy/Caddyfile
+# (giữ nguyên block noxhvn.com.vn), rồi:
+#   sudo systemctl reload caddy
+#
+# DNS A/AAAA trước khi xin Let's Encrypt:
+#   apiapp.haisanbay.com → IP VPS
+#
+# Firewall: mở 80 + 443 (bắt buộc cho HTTPS).
+# 3100/3101 có thể chỉ listen local — không cần public nếu đã có Caddy.
+
+apiapp.haisanbay.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:3100
+}

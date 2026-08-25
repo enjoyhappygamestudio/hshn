@@ -40,7 +40,7 @@ export const QuantityStepper: React.FC<QuantityStepperProps> = ({
           <Text style={[styles.btnText, isAtMax && styles.btnTextDisabled]}>+</Text>
         </TouchableOpacity>
         {stock != null && (
-          <Text style={styles.stock}>Còn {stock} phần</Text>
+          <Text style={styles.stock}>Còn {stock} trong kho</Text>
         )}
       </View>
       {isAtMax && stock != null && (

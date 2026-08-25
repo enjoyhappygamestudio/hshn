@@ -16,6 +16,7 @@ dist/
 # Runtime data
 uploads/
 logs/
+.run/
 *.log
 
 # OS

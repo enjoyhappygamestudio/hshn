@@ -19,24 +19,9 @@ import { BackButton } from '../components/BackButton';
 import { geocodeAddress } from '../utils/geocode';
 import { HANOI_DISTRICTS, HANOI_STREETS, HANOI_STREETS_NORM, HanoiDistrict } from '../data/hanoi';
 import { normalizeVietnamese } from '../utils/geocode';
+import { addressMapHtml, WEBVIEW_MAP_PROPS } from '../utils/leafletMap';
 
 const HANOI_DEFAULT = { latitude: 21.0278, longitude: 105.8342 };
-
-function buildMapHtml(lat: number, lng: number) {
-  return `
-    <!DOCTYPE html>
-    <html><head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <style>html,body,iframe{margin:0;padding:0;width:100%;height:100%;border:none;}</style>
-    </head><body>
-    <iframe
-      src="https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.003},${lat - 0.002},${lng + 0.003},${lat + 0.002}&layer=mapnik&marker=${lat},${lng}"
-      style="width:100%;height:100%;border:none;"
-      loading="lazy"
-    ></iframe>
-    </body></html>
-  `;
-}
 
 function parseSavedAddress(saved: string): {
   district: HanoiDistrict | null;
@@ -342,9 +327,10 @@ export const AddressScreen: React.FC<AddressScreenProps> = ({ navigation }) => {
             ) : (
               <WebView
                 key={mapKey}
-                source={{ html: buildMapHtml(region.latitude, region.longitude) }}
+                source={{ html: addressMapHtml(region.latitude, region.longitude) }}
                 style={styles.map}
                 scrollEnabled={false}
+                {...WEBVIEW_MAP_PROPS}
               />
             )}
           </View>

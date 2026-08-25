@@ -22,7 +22,7 @@ import { useAuthStore } from '../stores/authStore';
 import { colors, radii, shadows, fonts, commonStyles } from '../constants/theme';
 import { Product, Category, FeaturedVideo } from '../types';
 import { fetchProducts, fetchCategories, fetchFeaturedVideos, recordVideoView } from '../services/api';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 import { formatMoney } from '../utils/format';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -47,10 +47,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setIsLoading(true);
     try {
       const t1 = Date.now();
+      // Videos are supplementary — a failure there must not blank out the catalogue.
       const [prods, cats, videos] = await Promise.all([
         fetchProducts(),
         fetchCategories(),
-        fetchFeaturedVideos(),
+        fetchFeaturedVideos().catch((e: any) => {
+          if (__DEV__) console.log('[Home] videos unavailable:', e.message);
+          return [] as any[];
+        }),
       ]);
       if (__DEV__) console.log(`[Home] API done in ${Date.now() - t1}ms: ${prods.length} products, ${cats.length} categories, ${videos.length} videos`);
       setProducts(prods);
@@ -181,10 +185,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               contentContainerStyle={styles.videoHScroll}
             >
               {featuredVideos.slice(0, 2).map((video, idx) => {
-                const vidUrl = video.url.startsWith('http') ? video.url : API_BASE_URL.replace('/api', '') + video.url;
-                const thumbUrl = video.thumbnail_url
-                  ? (video.thumbnail_url.startsWith('http') ? video.thumbnail_url : API_BASE_URL.replace('/api', '') + video.thumbnail_url)
-                  : null;
+                const vidUrl = mediaUrl(video.url) || '';
+                const thumbUrl = mediaUrl(video.thumbnail_url);
                 return (
                   <TouchableOpacity
                     key={video.id}

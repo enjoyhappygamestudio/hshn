@@ -14,9 +14,9 @@ Khi người dùng yêu cầu một hành động (A→Q), AI PHẢI tạo/kích
 | **H** | Tạo admin screen | `skills/code/admin-screen.md` → CRUD component + list + detail + filter |
 | **I** | Refactor | `rules/investigate/refactor-plan.md` → Migration plan + code + verify |
 | **J** | Điều tra | `rules/investigate/investigation.md` → Findings + root cause + recommendations |
-| **K** | Viết tài liệu | `skills/doc/write-docs.md` → README + API docs + changelog |
-| **L** | Triển khai | `skills/code/deploy.md` → Config + CI/CD + rollback plan |
-| **M** | Schema DB | `skills/code/database-schema.md` → Migration SQL + seed data + rollback |
+| **K** | Viết tài liệu | `rules/doc/build-van-hanh.md` + `skills/doc/write-docs.md` → README (3 chế độ, mẫu AppThueNha) + API docs + changelog |
+| **L** | Triển khai / hạ tầng | `rules/code/shared-infra.md` + `rules/code/cong-port.md` + `rules/doc/build-van-hanh.md` + `skills/code/deploy.md` → Config + CI/CD + rollback; Postgres/Redis dùng chung NOXH; cổng không trùng dự án khác; README đủ 3 chế độ |
+| **M** | Schema DB | `rules/code/shared-infra.md` + `skills/code/database-schema.md` → Migration trên `noxh-postgres` DB `haisanhanoi` |
 | **N** | State management | `skills/code/state-management.md` → Store + actions + reducers + selectors |
 | **O** | Navigation | `skills/code/navigation.md` → Route map + guards + deep links |
 | **P** | Tích hợp thanh toán | `skills/code/payment.md` → Payment flow + webhook + error handling |

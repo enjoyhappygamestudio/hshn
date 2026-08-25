@@ -17,7 +17,7 @@ import { useCartStore } from '../stores/cartStore';
 import { colors, radii, shadows, fonts, commonStyles } from '../constants/theme';
 import { FeaturedVideo } from '../types';
 import { fetchFeaturedVideos, recordVideoView } from '../services/api';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 import { formatMoney } from '../utils/format';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -77,14 +77,8 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
   })();
 
   const firstVideo = videos[0];
-  const firstVidUrl = firstVideo?.url?.startsWith('http')
-    ? firstVideo.url
-    : API_BASE_URL.replace('/api', '') + (firstVideo?.url || '');
-  const firstThumbUrl = firstVideo?.thumbnail_url?.startsWith('http')
-    ? firstVideo.thumbnail_url
-    : firstVideo?.thumbnail_url
-      ? API_BASE_URL.replace('/api', '') + firstVideo.thumbnail_url
-      : null;
+  const firstVidUrl = mediaUrl(firstVideo?.url) || '';
+  const firstThumbUrl = mediaUrl(firstVideo?.thumbnail_url);
 
   const handleTabPress = useCallback(
     (tab: string) => {
@@ -174,11 +168,7 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
         {/* Video grid */}
         <View style={styles.grid}>
           {filtered.map((video) => {
-            const thumbUrl = video.thumbnail_url?.startsWith('http')
-              ? video.thumbnail_url
-              : video.thumbnail_url
-                ? API_BASE_URL.replace('/api', '') + video.thumbnail_url
-                : null;
+            const thumbUrl = mediaUrl(video.thumbnail_url);
             return (
               <TouchableOpacity
                 key={video.id}

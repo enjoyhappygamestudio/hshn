@@ -12,7 +12,7 @@ import {
 import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii, shadows, fonts } from '../constants/theme';
-import { API_BASE_URL } from '../constants/config';
+import { mediaUrl } from '../utils/media';
 import { FeaturedVideo } from '../types';
 import { formatMoney } from '../utils/format';
 import { recordVideoView } from '../services/api';
@@ -53,7 +53,7 @@ export const VideoFeedScreen: React.FC<VideoFeedScreenProps> = ({ navigation, ro
             <View style={styles.thumbWrap}>
               {video.thumbnail_url ? (
                 <Image
-                  source={{ uri: video.thumbnail_url.startsWith('http') ? video.thumbnail_url : API_BASE_URL.replace('/api', '') + video.thumbnail_url }}
+                  source={{ uri: mediaUrl(video.thumbnail_url) || undefined }}
                   style={styles.thumb}
                 />
               ) : (

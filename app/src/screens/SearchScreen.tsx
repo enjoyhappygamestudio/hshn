@@ -15,7 +15,6 @@ import { colors, fonts, commonStyles } from '../constants/theme';
 import { Product } from '../types';
 import { fetchProducts } from '../services/api';
 import { formatMoney } from '../utils/format';
-import { API_BASE_URL } from '../constants/config';
 import { BackButton } from '../components/BackButton';
 
 interface SearchScreenProps {

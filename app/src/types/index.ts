@@ -10,6 +10,7 @@ export interface Product {
   distance: string;
   isFresh: boolean;
   isOutOfStock: boolean;
+  stock?: number;
   imageBg: string;
   emoji: string;
   description?: string;
