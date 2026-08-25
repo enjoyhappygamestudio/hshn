@@ -94,11 +94,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     });
   }, [customer]);
 
-  const effFee = useCallback((base: number) => {
-    const mult = useCheckoutStore.getState().delivery.mode === 'hoatoc' ? 1.5 : 1;
-    return Math.round((base * mult) / 1000) * 1000;
-  }, []);
-
   const loadFee = useCallback(async (partner: ShippingPartner, lat?: number, lng?: number) => {
     const reqId = ++feeReqRef.current;
     setBaseFee(null);
@@ -119,15 +114,6 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     setSelectedPartner(partner.id);
     loadFee(partner, deliveryCoords?.lat, deliveryCoords?.lng);
   }, [loadFee, deliveryCoords]);
-
-  const prevModeRef = useRef(delivery.mode);
-  useEffect(() => {
-    if (prevModeRef.current === delivery.mode) return;
-    prevModeRef.current = delivery.mode;
-    if (!selectedPartner) return;
-    const p = shippingPartners.find((x) => x.id === selectedPartner);
-    if (p) loadFee(p, deliveryCoords?.lat, deliveryCoords?.lng);
-  }, [delivery.mode, selectedPartner, shippingPartners, loadFee, deliveryCoords]);
 
   useEffect(() => {
     (async () => {
@@ -167,7 +153,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
     })();
   }, [customer?.address, cartWeight, loadFee]);
 
-  const selectedFee = baseFee == null ? null : effFee(baseFee);
+  const selectedFee = baseFee;
 
   const isAhaMove = !!shippingPartners.find(
     (p) => p.id === selectedPartner && p.name.toLowerCase().includes('ahamove'),
@@ -461,7 +447,7 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
 
             {delivery.mode === 'hoatoc' && (
               <Text style={styles.feeNote}>
-                ⚡ Giao siêu tốc — phí ship cao hơn 50% so với giao 4H.
+                ⚡ Giao siêu tốc — tài xế ưu tiên nhận đơn trong 30 phút.
               </Text>
             )}
             {delivery.mode === 'express2h' && (
@@ -485,11 +471,12 @@ export const CheckoutScreen: React.FC<CheckoutScreenProps> = ({ navigation }) =>
                 <>
                   Phí giao hàng:{' '}
                   <Text style={styles.feeBold}>{formatMoney(shipFeeToDisplay)}</Text>
+                  {' '}(tạm tính theo giá hiện tại)
                 </>
               ) : geoFailed ? (
                 'Không xác định được vị trí giao hàng'
               ) : (
-                'Đơn vị này chưa tích hợp API đặt ship'
+                'Chưa tính được phí giao hàng, vui lòng thử lại'
               )}
             </Text>
           )}

@@ -14,6 +14,7 @@ export interface CarrierFeeResult {
   estimatedDays: number;
   serviceName: string;
   carrier: string;
+  serviceId?: string;
 }
 
 export interface CarrierOrderRequest {
@@ -28,6 +29,8 @@ export interface CarrierOrderRequest {
   cod: number;
   note?: string;
   orderTime?: number;
+  // Dịch vụ đã báo giá — truyền lại để đơn thật dùng đúng dịch vụ đó, tránh lệch phí
+  serviceId?: string;
 }
 
 export interface CarrierOrderResult {
@@ -210,6 +213,10 @@ class ViettelCarrier implements CarrierService {
   }
 }
 
+// Dịch vụ AhaMove dùng để đặt đơn. Báo giá phải trả về đúng dịch vụ này,
+// nếu không phí khách thấy sẽ là của dịch vụ khác với đơn thật.
+const DEFAULT_SERVICE = 'BIKE';
+
 class AhaMoveCarrier implements CarrierService {
   name = 'AhaMove';
   enabled = config.shipping.ahamove.enabled;
@@ -273,21 +280,33 @@ class AhaMoveCarrier implements CarrierService {
     return data;
   }
 
-  async calculateFee(req: CarrierFeeRequest): Promise<CarrierFeeResult> {
+  private async estimate(req: CarrierFeeRequest): Promise<{ serviceId: string; fee: number }> {
     const data = await this.call('POST', '/orders/estimates', {
       order_time: 0,
       path: [
         { lat: req.fromLat || config.shipping.ahamove.shopLat, lng: req.fromLng || config.shipping.ahamove.shopLng, address: this.shopAddress, name: this.shopName, mobile: this.normalizePhone(this.shopPhone) },
         { lat: req.toLat, lng: req.toLng, address: 'Địa chỉ giao hàng', name: 'Khách', mobile: '84981230001' },
       ],
-      group_services: [{ _id: 'BIKE', group_requests: [] }, { _id: 'ECO', group_requests: [] }],
+      group_services: [{ _id: DEFAULT_SERVICE, group_requests: [] }, { _id: 'ECO', group_requests: [] }],
       payment_method: 'CASH',
       items: [{ _id: 'GOODS', num: 1, name: 'Hàng hóa', price: req.cod || 0 }],
       package_detail: [{ weight: Math.max(0.5, req.weight) }],
     });
-    const estimate = Array.isArray(data) ? data.find((s: any) => s.data?.total_fee && !s.error) : null;
-    const fee = estimate?.data?.total_fee || estimate?.data?.total_price || 0;
-    return { fee, estimatedDays: 1, serviceName: estimate?.service_id || 'BIKE', carrier: 'AhaMove' };
+    const usable = (Array.isArray(data) ? data : []).filter(
+      (s: any) => !s.error && (s.data?.total_fee || s.data?.total_price),
+    );
+    // Ưu tiên dịch vụ mặc định để giá báo cho khách khớp dịch vụ sẽ đặt; hết mới lấy dịch vụ còn lại
+    const picked =
+      usable.find((s: any) => String(s.service_id || '').toUpperCase().includes(DEFAULT_SERVICE)) || usable[0];
+    return {
+      serviceId: picked?.service_id || DEFAULT_SERVICE,
+      fee: picked?.data?.total_fee || picked?.data?.total_price || 0,
+    };
+  }
+
+  async calculateFee(req: CarrierFeeRequest): Promise<CarrierFeeResult> {
+    const { serviceId, fee } = await this.estimate(req);
+    return { fee, estimatedDays: 1, serviceName: serviceId, serviceId, carrier: 'AhaMove' };
   }
 
   async createOrder(req: CarrierOrderRequest): Promise<CarrierOrderResult> {
@@ -314,7 +333,7 @@ class AhaMoveCarrier implements CarrierService {
           remarks: req.note || '',
         },
       ],
-      group_service_id: 'BIKE',
+      group_service_id: req.serviceId || DEFAULT_SERVICE,
       group_requests: [],
       payment_method: 'CASH',
       items: req.items.map((i, idx) => ({
@@ -521,6 +540,12 @@ export async function calculateFee(req: CarrierFeeRequest): Promise<CarrierFeeRe
   const active = getActiveCarriers();
   if (active.length === 0) return [];
   return Promise.all(active.map(c => c.calculateFee(req)));
+}
+
+export async function quoteFee(carrierName: string, req: CarrierFeeRequest): Promise<CarrierFeeResult | null> {
+  const carrier = carriers.find(c => c.name === carrierName && c.enabled);
+  if (!carrier) return null;
+  return carrier.calculateFee(req);
 }
 
 export async function createShipOrder(carrierName: string, req: CarrierOrderRequest): Promise<CarrierOrderResult> {
