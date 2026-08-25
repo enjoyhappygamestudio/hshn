@@ -341,7 +341,7 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
     })();
 
     return (
-      <View style={[styles.commentItem, { marginLeft: depth * 24 }, depth > 0 && styles.commentItemReply]}>
+      <View style={[styles.commentItem, { marginLeft: Math.min(depth, 3) * 20 }, depth > 0 && styles.commentItemReply]}>
         <View style={styles.commentAvatar}>
           <Text style={styles.commentAvatarText}>👩</Text>
         </View>
@@ -351,15 +351,15 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
             <View style={styles.commentRightActions}>
               <View style={styles.commentActions}>
                 <TouchableOpacity onPress={() => { setReplyTo(item); setCommentText(`@${item.customer_name} `); }} style={styles.commentActionBtn}>
-                  <Feather name="message-circle" size={16} color="#999" />
+                  <Feather name="message-circle" size={20} color={colors.muted} />
                 </TouchableOpacity>
                 {isOwn && (
                   <>
                     <TouchableOpacity onPress={() => handleEditComment(item)} style={styles.commentActionBtn}>
-                      <Feather name="edit-2" size={16} color={colors.primary} />
+                      <Feather name="edit-2" size={20} color={colors.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDeleteComment(item.id)} style={styles.commentActionBtn}>
-                      <Feather name="trash-2" size={16} color="#ff6b6b" />
+                      <Feather name="trash-2" size={20} color="#ff6b6b" />
                     </TouchableOpacity>
                   </>
                 )}
@@ -427,10 +427,14 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
         <>
           {/* Top bar */}
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => {
-              useCartStore.getState().removeItem(String(video.product_id));
-              navigation.goBack();
-            }}>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              onPress={() => {
+                useCartStore.getState().removeItem(String(video.product_id));
+                navigation.goBack();
+              }}
+            >
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -491,8 +495,12 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
             <View>
               <View style={styles.commentsHeader}>
                 <Text style={styles.commentsTitle}>Bình luận ({comments.length})</Text>
-                <TouchableOpacity onPress={() => setShowComments(false)}>
-                  <Text style={{ color: '#fff', fontSize: 18 }}>✕</Text>
+                <TouchableOpacity
+                  style={styles.commentsCloseBtn}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  onPress={() => setShowComments(false)}
+                >
+                  <Text style={styles.commentsCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
 
@@ -506,7 +514,11 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
                   </Text>
                 ) : null}
                 {desc && desc.length > 80 && (
-                  <TouchableOpacity onPress={() => setShowFullDesc((s) => !s)}>
+                  <TouchableOpacity
+                    style={styles.descToggleBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setShowFullDesc((s) => !s)}
+                  >
                     <Text style={styles.descToggle}>{showFullDesc ? 'Thu gọn' : 'Xem thêm'}</Text>
                   </TouchableOpacity>
                 )}
@@ -520,14 +532,18 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
                 style={styles.commentsList}
                 contentContainerStyle={{ paddingBottom: 8 }}
                 ListEmptyComponent={
-                  <Text style={{ color: '#999', fontSize: 12, textAlign: 'center', marginTop: 20 }}>Chưa có bình luận</Text>
+                  <Text style={{ color: colors.muted, fontSize: 14, textAlign: 'center', marginTop: 28 }}>Chưa có bình luận</Text>
                 }
               />
               {replyTo && (
                 <View style={styles.replyIndicator}>
-                  <Text style={styles.replyIndicatorText}>Đang trả lời @{replyTo.customer_name}</Text>
-                  <TouchableOpacity onPress={() => { setReplyTo(null); setCommentText(''); }}>
-                    <Feather name="x" size={14} color="#999" />
+                  <Text style={styles.replyIndicatorText} numberOfLines={1}>Đang trả lời @{replyTo.customer_name}</Text>
+                  <TouchableOpacity
+                    style={styles.replyCancelBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => { setReplyTo(null); setCommentText(''); }}
+                  >
+                    <Feather name="x" size={20} color={colors.muted} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -536,7 +552,7 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
                   <TextInput
                     style={styles.commentInput}
                     placeholder="Nhập bình luận..."
-                    placeholderTextColor="#888"
+                    placeholderTextColor={colors.muted}
                     value={commentText}
                     onChangeText={setCommentText}
                     onSubmitEditing={handleSendComment}
@@ -579,10 +595,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, zIndex: 20,
   },
   closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center',
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
   },
-  closeText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  closeText: { color: '#fff', fontSize: 22, fontWeight: '700', lineHeight: 26 },
   topRight: { flexDirection: 'row', gap: 8 },
   topIconBtn: { alignItems: 'center', minWidth: 40 },
   topIconText: { fontSize: 22 },
@@ -593,7 +609,7 @@ const styles = StyleSheet.create({
     position: 'absolute', right: 12, bottom: 120,
     alignItems: 'center', gap: 16, zIndex: 25,
   },
-  floatingBtn: { alignItems: 'center' },
+  floatingBtn: { alignItems: 'center', justifyContent: 'center', minWidth: 52, minHeight: 48 },
   floatingIcon: { fontSize: 28 },
   floatingIconWhite: { fontSize: 32, color: '#fff' },
   shareIcon: { fontSize: 32, color: '#fff', fontWeight: '900' },
@@ -627,66 +643,74 @@ const styles = StyleSheet.create({
   // Comments modal
   modalOverlay: {
     flex: 1, justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   modalContent: {
-    backgroundColor: 'rgba(20,20,20,0.98)',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    height: SCREEN_H * 0.55,
+    height: SCREEN_H * 0.72,
   },
   commentsHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)',
+    paddingLeft: 14, paddingRight: 8, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
   },
-  commentsTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  commentsList: { flex: 1, paddingHorizontal: 6 },
-  modalProductInfo: {
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
-  modalProductName: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  modalProductPrice: { color: '#FFD700', fontSize: 16, fontWeight: '800', fontFamily: fonts.numeric, marginBottom: 4 },
-  modalProductDesc: { color: '#bbb', fontSize: 12, lineHeight: 17 },
-  descToggle: { color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 4 },
-  commentItem: { flexDirection: 'row', gap: 4, marginTop: 10, paddingRight: 4 },
-  commentAvatar: {
-    width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.2)',
+  commentsTitle: { color: colors.navy, fontSize: 16, fontWeight: '700' },
+  commentsCloseBtn: {
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
   },
-  commentAvatarImg: { width: 20, height: 20, borderRadius: 10 },
-  commentAvatarText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  commentsCloseText: { color: colors.navy, fontSize: 22, fontWeight: '700', lineHeight: 26 },
+  commentsList: { flex: 1, paddingHorizontal: 12, backgroundColor: colors.white },
+  modalProductInfo: {
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+    backgroundColor: colors.white,
+  },
+  modalProductName: { color: colors.navy, fontSize: 15, fontWeight: '700', marginBottom: 4 },
+  modalProductPrice: { color: colors.coral, fontSize: 16, fontWeight: '800', fontFamily: fonts.numeric, marginBottom: 4 },
+  modalProductDesc: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  descToggleBtn: { alignSelf: 'flex-start', paddingVertical: 6, paddingRight: 12 },
+  descToggle: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  commentItem: { flexDirection: 'row', gap: 10, marginTop: 14, paddingRight: 4 },
+  commentAvatar: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: colors.mint,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  commentAvatarImg: { width: 34, height: 34, borderRadius: 17 },
+  commentAvatarText: { color: colors.navy, fontSize: 16, fontWeight: '700' },
   commentBubble: { flex: 1 },
-  commentBubbleOwn: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: 6 },
-  commentNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  commentBubbleOwn: { backgroundColor: colors.mint, borderRadius: 10, padding: 8 },
+  commentNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   commentRightActions: {},
-  commentActions: { flexDirection: 'row', gap: 6 },
-  commentActionBtn: { padding: 4 },
-  editInput: { color: '#fff', fontSize: 12, lineHeight: 16, marginTop: 1, borderBottomWidth: 1, borderBottomColor: colors.primary, paddingVertical: 2 },
-  commentTime: { color: '#888', fontSize: 10, marginTop: 4 },
+  commentActions: { flexDirection: 'row', gap: 4 },
+  commentActionBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  editInput: { color: colors.navy, fontSize: 15, lineHeight: 21, marginTop: 2, borderBottomWidth: 1, borderBottomColor: colors.primary, paddingVertical: 4 },
+  commentTime: { color: colors.muted, fontSize: 11.5, marginTop: 4 },
   commentFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  replyBtn: { color: colors.primary, fontSize: 10, fontWeight: '600' },
+  replyBtn: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   commentItemReply: {},
-  replyToText: { color: '#aaa', fontSize: 10, marginBottom: 2 },
+  replyToText: { color: colors.muted, fontSize: 11.5, marginBottom: 2 },
   replyIndicator: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 12, paddingVertical: 6,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.mint, paddingLeft: 12, paddingRight: 4, paddingVertical: 4,
+    borderTopWidth: 1, borderTopColor: colors.line,
   },
-  replyIndicatorText: { color: '#999', fontSize: 11 },
-  commentName: { color: '#FFD700', fontSize: 11, fontWeight: '600' },
-  commentContent: { color: '#eee', fontSize: 12, lineHeight: 16, marginTop: 1 },
+  replyIndicatorText: { color: colors.muted, fontSize: 12.5, flex: 1 },
+  replyCancelBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  commentName: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  commentContent: { color: colors.navy, fontSize: 14.5, lineHeight: 20, marginTop: 2 },
   commentInputBar: {
     flexDirection: 'row', alignItems: 'center',
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)',
+    borderTopWidth: 1, borderTopColor: colors.line,
     paddingHorizontal: 12, paddingVertical: 8,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    backgroundColor: 'rgba(20,20,20,0.95)',
+    backgroundColor: colors.white,
   },
   commentInputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 20,
-    paddingLeft: 12, height: 38,
+    backgroundColor: colors.line, borderRadius: 24,
+    paddingLeft: 14, height: 48,
   },
 
   // Description
@@ -706,7 +730,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 30 : 8,
     zIndex: 20,
   },
-  commentInput: { flex: 1, color: '#fff', fontSize: 13, paddingVertical: 0 },
-  sendBtn: { paddingHorizontal: 10, height: 36, justifyContent: 'center' },
-  sendBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  commentInput: { flex: 1, color: colors.navy, fontSize: 15, paddingVertical: 0 },
+  sendBtn: { paddingHorizontal: 16, height: 48, justifyContent: 'center' },
+  sendBtnText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
 });

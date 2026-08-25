@@ -586,12 +586,31 @@ router.get('/dashboard', authenticate, requireAdmin, async (req: AuthRequest, re
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    const [ordersToday, revenueToday, totalProducts, totalCustomers, recentOrders] = await Promise.all([
+    const [ordersToday, revenueToday, totalProducts, totalCustomers, recentOrders, productsSoldToday] = await Promise.all([
       query(`SELECT COUNT(*)::int as count FROM orders WHERE created_at::date = $1`, [today]),
       query(`SELECT COALESCE(SUM(total), 0)::int as revenue FROM orders WHERE created_at::date = $1 AND status != 'cancelled'`, [today]),
       query(`SELECT COUNT(*)::int as count FROM products WHERE active = true`),
       query(`SELECT COUNT(*)::int as count FROM customers`),
       query(`SELECT o.*, c.name as customer_name FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ORDER BY o.created_at DESC LIMIT 10`),
+      query(`
+        SELECT
+          COALESCE(item->>'product_id', '') AS product_id,
+          COALESCE(NULLIF(item->>'name', ''), 'Sản phẩm') AS name,
+          COALESCE(item->>'variant', '') AS variant,
+          SUM(COALESCE((item->>'quantity')::int, 0))::int AS quantity,
+          SUM(
+            COALESCE((item->>'price')::int, 0) * COALESCE((item->>'quantity')::int, 0)
+          )::int AS revenue
+        FROM orders o,
+        LATERAL jsonb_array_elements(
+          CASE WHEN jsonb_typeof(o.items) = 'array' THEN o.items ELSE '[]'::jsonb END
+        ) AS item
+        WHERE o.created_at::date = $1
+          AND o.status != 'cancelled'
+        GROUP BY 1, 2, 3
+        HAVING SUM(COALESCE((item->>'quantity')::int, 0)) > 0
+        ORDER BY quantity DESC, name
+      `, [today]),
     ]);
 
     // Revenue chart (7 days)
@@ -601,13 +620,173 @@ router.get('/dashboard', authenticate, requireAdmin, async (req: AuthRequest, re
       GROUP BY created_at::date ORDER BY date
     `);
 
+    const soldToday = productsSoldToday.rows;
+    const unitsSoldToday = soldToday.reduce((sum: number, row: { quantity: number }) => sum + (row.quantity || 0), 0);
+
     res.json(success({
       ordersToday: ordersToday.rows[0].count,
       revenueToday: revenueToday.rows[0].revenue,
       totalProducts: totalProducts.rows[0].count,
       totalCustomers: totalCustomers.rows[0].count,
+      unitsSoldToday,
+      productsSoldToday: soldToday,
       revenue7Days: revenue7Days.rows,
       recentOrders: recentOrders.rows,
+    }));
+  } catch (err: any) {
+    res.status(500).json(error(err.message));
+  }
+});
+
+const SOLD_ITEMS_SQL = `
+  SELECT
+    o.created_at,
+    COALESCE(item->>'product_id', '') AS product_id,
+    COALESCE(NULLIF(item->>'name', ''), 'Sản phẩm') AS name,
+    COALESCE(item->>'variant', '') AS variant,
+    GREATEST(COALESCE((item->>'quantity')::int, 0), 0) AS quantity,
+    GREATEST(COALESCE((item->>'price')::int, 0), 0) AS price
+  FROM orders o
+  CROSS JOIN LATERAL jsonb_array_elements(
+    CASE WHEN jsonb_typeof(o.items) = 'array' THEN o.items ELSE '[]'::jsonb END
+  ) AS item
+  WHERE o.status <> 'cancelled'
+`;
+
+router.get('/analytics', authenticate, requireAdmin, async (_req: AuthRequest, res: Response) => {
+  try {
+    const bounds = await query(`
+      SELECT
+        (date_trunc('week', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS week_start,
+        (date_trunc('month', NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh') AS month_start,
+        NOW() AS now
+    `);
+    const weekStart = bounds.rows[0].week_start;
+    const monthStart = bounds.rows[0].month_start;
+
+    const [orderStats, unitStats, bestSellers, slowSellers, eventStats, topViews, topCart, voucherUsage] = await Promise.all([
+      query(`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= $1)::int AS orders_week,
+          COUNT(*) FILTER (WHERE created_at >= $2)::int AS orders_month,
+          COALESCE(SUM(total) FILTER (WHERE created_at >= $1), 0)::int AS revenue_week,
+          COALESCE(SUM(total) FILTER (WHERE created_at >= $2), 0)::int AS revenue_month,
+          COALESCE(SUM(discount) FILTER (WHERE created_at >= $1 AND COALESCE(voucher_code, '') <> ''), 0)::int AS voucher_week,
+          COALESCE(SUM(discount) FILTER (WHERE created_at >= $2 AND COALESCE(voucher_code, '') <> ''), 0)::int AS voucher_month,
+          COUNT(*) FILTER (WHERE created_at >= $1 AND COALESCE(voucher_code, '') <> '')::int AS voucher_orders_week,
+          COUNT(*) FILTER (WHERE created_at >= $2 AND COALESCE(voucher_code, '') <> '')::int AS voucher_orders_month
+        FROM orders
+        WHERE status <> 'cancelled'
+      `, [weekStart, monthStart]),
+      query(`
+        SELECT
+          COALESCE(SUM(quantity) FILTER (WHERE created_at >= $1), 0)::int AS units_week,
+          COALESCE(SUM(quantity) FILTER (WHERE created_at >= $2), 0)::int AS units_month
+        FROM (${SOLD_ITEMS_SQL}) s
+      `, [weekStart, monthStart]),
+      query(`
+        SELECT product_id, name, variant,
+          SUM(quantity)::int AS quantity,
+          SUM(price * quantity)::int AS revenue
+        FROM (${SOLD_ITEMS_SQL}) s
+        WHERE created_at >= $1 AND product_id <> ''
+        GROUP BY product_id, name, variant
+        ORDER BY quantity DESC, revenue DESC
+        LIMIT 10
+      `, [monthStart]),
+      query(`
+        WITH sold AS (
+          SELECT product_id, SUM(quantity)::int AS quantity
+          FROM (${SOLD_ITEMS_SQL}) s
+          WHERE created_at >= $1 AND product_id <> ''
+          GROUP BY product_id
+        )
+        SELECT
+          p.id AS product_id,
+          p.name,
+          COALESCE(sold.quantity, 0)::int AS quantity,
+          COALESCE((
+            SELECT SUM(e.quantity)::int FROM product_events e
+            WHERE e.product_id = p.id AND e.event_type = 'view' AND e.created_at >= $1
+          ), 0) AS views,
+          COALESCE((
+            SELECT SUM(e.quantity)::int FROM product_events e
+            WHERE e.product_id = p.id AND e.event_type = 'add_to_cart' AND e.created_at >= $1
+          ), 0) AS cart_adds
+        FROM products p
+        LEFT JOIN sold ON sold.product_id = p.id::text
+        WHERE p.active = true
+          AND COALESCE(sold.quantity, 0) < 3
+        ORDER BY COALESCE(sold.quantity, 0) ASC, views DESC, p.name
+        LIMIT 15
+      `, [monthStart]),
+      query(`
+        SELECT
+          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'view' AND created_at >= $1), 0)::int AS views_month,
+          COALESCE(SUM(quantity) FILTER (WHERE event_type = 'add_to_cart' AND created_at >= $1), 0)::int AS cart_qty_month,
+          COUNT(*) FILTER (WHERE event_type = 'view' AND created_at >= $1)::int AS view_events_month,
+          COUNT(*) FILTER (WHERE event_type = 'add_to_cart' AND created_at >= $1)::int AS cart_events_month
+        FROM product_events
+      `, [monthStart]),
+      query(`
+        SELECT p.id AS product_id, p.name, SUM(e.quantity)::int AS views
+        FROM product_events e
+        JOIN products p ON p.id = e.product_id
+        WHERE e.event_type = 'view' AND e.created_at >= $1
+        GROUP BY p.id, p.name
+        ORDER BY views DESC
+        LIMIT 10
+      `, [monthStart]),
+      query(`
+        SELECT p.id AS product_id, p.name, SUM(e.quantity)::int AS quantity, COUNT(*)::int AS times
+        FROM product_events e
+        JOIN products p ON p.id = e.product_id
+        WHERE e.event_type = 'add_to_cart' AND e.created_at >= $1
+        GROUP BY p.id, p.name
+        ORDER BY quantity DESC
+        LIMIT 10
+      `, [monthStart]),
+      query(`
+        SELECT
+          o.voucher_code AS code,
+          COALESCE(v.label, o.voucher_code) AS label,
+          COUNT(*)::int AS uses,
+          COALESCE(SUM(o.discount), 0)::int AS discount
+        FROM orders o
+        LEFT JOIN vouchers v ON LOWER(v.code) = LOWER(o.voucher_code)
+        WHERE o.status <> 'cancelled'
+          AND o.created_at >= $1
+          AND COALESCE(o.voucher_code, '') <> ''
+        GROUP BY o.voucher_code, v.label
+        ORDER BY discount DESC, uses DESC
+      `, [monthStart]),
+    ]);
+
+    const o = orderStats.rows[0];
+    const u = unitStats.rows[0];
+    const e = eventStats.rows[0];
+
+    res.json(success({
+      weekStart,
+      monthStart,
+      unitsWeek: u.units_week,
+      unitsMonth: u.units_month,
+      ordersWeek: o.orders_week,
+      ordersMonth: o.orders_month,
+      revenueWeek: o.revenue_week,
+      revenueMonth: o.revenue_month,
+      voucherWeek: o.voucher_week,
+      voucherMonth: o.voucher_month,
+      voucherOrdersWeek: o.voucher_orders_week,
+      voucherOrdersMonth: o.voucher_orders_month,
+      viewsMonth: e.views_month,
+      cartQtyMonth: e.cart_qty_month,
+      cartEventsMonth: e.cart_events_month,
+      bestSellers: bestSellers.rows,
+      slowSellers: slowSellers.rows,
+      topViews: topViews.rows,
+      topCart: topCart.rows,
+      voucherUsage: voucherUsage.rows,
     }));
   } catch (err: any) {
     res.status(500).json(error(err.message));

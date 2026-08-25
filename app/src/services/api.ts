@@ -53,9 +53,23 @@ api.interceptors.response.use(
 );
 
 // ─── Products ───
+const PRODUCTS_PAGE_SIZE = 100; // API giới hạn limit tối đa 100
+
 export async function fetchProducts(): Promise<Product[]> {
-  const res: any = await api.get('/products');
-  return res.data.map(mapProduct);
+  const first: any = await api.get('/products', { params: { page: 1, limit: PRODUCTS_PAGE_SIZE } });
+  const rows: any[] = [...(first.data || [])];
+
+  const totalPages = first.pagination?.totalPages || 1;
+  if (totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        api.get('/products', { params: { page: i + 2, limit: PRODUCTS_PAGE_SIZE } }),
+      ),
+    );
+    for (const res of rest as any[]) rows.push(...(res.data || []));
+  }
+
+  return rows.map(mapProduct);
 }
 
 export async function fetchProductDetail(id: string): Promise<Product> {
@@ -66,6 +80,16 @@ export async function fetchProductDetail(id: string): Promise<Product> {
 export async function fetchProductVariants(productId: string): Promise<any[]> {
   const res: any = await api.get(`/products/${productId}/variants`);
   return res.data;
+}
+
+export function trackProductView(productId: string) {
+  if (!productId) return;
+  api.post(`/products/${productId}/view`).catch(() => {});
+}
+
+export function trackAddToCart(productId: string, quantity = 1) {
+  if (!productId) return;
+  api.post(`/products/${productId}/add-to-cart`, { quantity }).catch(() => {});
 }
 
 // ─── Categories ───

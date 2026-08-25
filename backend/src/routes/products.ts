@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response) => {
       LEFT JOIN shops s ON p.shop_id = s.id
       LEFT JOIN categories c ON p.category_id = c.id
       ${where}
-      ORDER BY p.rating DESC, p.sold_count DESC
+      ORDER BY p.rating DESC, p.sold_count DESC, p.id
       LIMIT $${paramIdx++} OFFSET $${paramIdx++}
     `;
     params.push(limitNum, offset);
@@ -75,6 +75,41 @@ router.get('/:id', async (req: Request, res: Response) => {
     );
 
     res.json(success({ ...product, variants: variantsResult.rows }));
+  } catch (err: any) {
+    res.status(500).json(error(err.message));
+  }
+});
+
+router.post('/:id/view', async (req: Request, res: Response) => {
+  try {
+    const result = await query(
+      `INSERT INTO product_events (product_id, event_type, quantity)
+       SELECT id, 'view', 1 FROM products WHERE id = $1
+       RETURNING id`,
+      [req.params.id],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(error('Không tìm thấy sản phẩm'));
+    }
+    res.json(success({ ok: true }));
+  } catch (err: any) {
+    res.status(500).json(error(err.message));
+  }
+});
+
+router.post('/:id/add-to-cart', async (req: Request, res: Response) => {
+  try {
+    const qty = Math.max(1, Math.min(99, parseInt(String(req.body?.quantity || 1), 10) || 1));
+    const result = await query(
+      `INSERT INTO product_events (product_id, event_type, quantity)
+       SELECT id, 'add_to_cart', $2 FROM products WHERE id = $1
+       RETURNING id`,
+      [req.params.id, qty],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(error('Không tìm thấy sản phẩm'));
+    }
+    res.json(success({ ok: true }));
   } catch (err: any) {
     res.status(500).json(error(err.message));
   }

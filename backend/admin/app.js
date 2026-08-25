@@ -117,6 +117,7 @@ function render() {
       </div>
       <nav class="sidebar-nav">
         <a href="#" data-page="dashboard" class="${state.page === 'dashboard' ? 'active' : ''}"><span class="icon">📊</span> Tổng quan</a>
+        <a href="#" data-page="analytics" class="${state.page === 'analytics' ? 'active' : ''}"><span class="icon">📈</span> Tổng hợp & phân tích</a>
         <a href="#" data-page="products" class="${state.page === 'products' || state.page === 'product-edit' ? 'active' : ''}"><span class="icon">🦐</span> Sản phẩm</a>
         <a href="#" data-page="orders" class="${state.page === 'orders' ? 'active' : ''}"><span class="icon">📦</span> Đơn hàng <span id="orders-badge" style="display:none;background:var(--danger);color:white;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px"></span><span id="orders-hard-badge" title="Đơn khó nhận ship" style="display:none;background:#7f1d1d;color:white;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px">⚠️ <span id="orders-hard-badge-count"></span></span></a>
         <a href="#" data-page="customers" class="${state.page === 'customers' ? 'active' : ''}"><span class="icon">👥</span> Khách hàng</a>
@@ -169,6 +170,7 @@ function render() {
 
   switch (state.page) {
     case 'dashboard': renderDashboard(content); break;
+    case 'analytics': renderAnalytics(content); break;
     case 'products': renderProducts(content); break;
     case 'product-edit': renderProductEdit(content); break;
     case 'orders': renderOrders(content); break;
@@ -316,7 +318,7 @@ function can(perm) {
   return state.admin.role !== 'inventory_staff';
 }
 function pageTitle() {
-  const t = { dashboard:'Tổng quan', products:'Sản phẩm', 'product-edit': state.params?.id ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm', orders:'Đơn hàng', 'order-detail':'Chi tiết đơn hàng', customers:'Khách hàng', vouchers:'Khuyến mãi', inbox:'Hộp thư hỗ trợ', videos:'Video sản phẩm', 'shipping-partners':'Đối tác vận chuyển', 'support-settings':'Hỗ trợ khách hàng', 'invoice-settings':'Cấu hình hóa đơn VAT', 'invoice-rules':'Quy tắc xuất hóa đơn', invoices:'Lịch sử hóa đơn', 'invoice-detail':'Chi tiết hóa đơn' }[state.page];
+  const t = { dashboard:'Tổng quan', analytics:'Tổng hợp và phân tích', products:'Sản phẩm', 'product-edit': state.params?.id ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm', orders:'Đơn hàng', 'order-detail':'Chi tiết đơn hàng', customers:'Khách hàng', vouchers:'Khuyến mãi', inbox:'Hộp thư hỗ trợ', videos:'Video sản phẩm', 'shipping-partners':'Đối tác vận chuyển', 'support-settings':'Hỗ trợ khách hàng', 'invoice-settings':'Cấu hình hóa đơn VAT', 'invoice-rules':'Quy tắc xuất hóa đơn', invoices:'Lịch sử hóa đơn', 'invoice-detail':'Chi tiết hóa đơn' }[state.page];
   return t || 'Admin';
 }
 
@@ -352,28 +354,183 @@ async function renderDashboard(el) {
   try {
     const data = await api('GET', '/admin/dashboard');
     const d = data.data;
+    const sold = d.productsSoldToday || [];
+    const recent = d.recentOrders || [];
     el.innerHTML = `
       <div class="stat-grid">
         <div class="stat-card"><span class="value">${d.ordersToday}</span><span class="label">Đơn hôm nay</span></div>
         <div class="stat-card"><span class="value">${fmt(d.revenueToday)}₫</span><span class="label">Doanh thu hôm nay</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.unitsSoldToday || 0)}</span><span class="label">Số lượng bán hôm nay</span></div>
+        <div class="stat-card"><span class="value">${sold.length}</span><span class="label">Mặt hàng bán hôm nay</span></div>
         <div class="stat-card"><span class="value">${d.totalProducts}</span><span class="label">Sản phẩm đang bán</span></div>
         <div class="stat-card"><span class="value">${d.totalCustomers}</span><span class="label">Khách hàng</span></div>
       </div>
       <div class="card">
+        <div class="card-header"><h3>Sản phẩm bán hôm nay</h3></div>
+        <div class="table-wrap">
+          ${sold.length ? `<table>
+            <thead><tr><th>Sản phẩm</th><th>Phân loại</th><th>Số lượng</th><th>Doanh thu</th></tr></thead>
+            <tbody>
+              ${sold.map(p => `<tr>
+                <td>${esc(p.name)}</td>
+                <td>${esc(p.variant || '—')}</td>
+                <td class="num">${fmt(p.quantity)}</td>
+                <td class="num">${fmt(p.revenue)}₫</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : `<p class="empty-hint">Chưa có sản phẩm nào được bán hôm nay.</p>`}
+        </div>
+      </div>
+      <div class="card">
         <div class="card-header"><h3>Đơn hàng gần đây</h3></div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
+          ${recent.length ? `<table>
+            <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày</th><th></th></tr></thead>
             <tbody>
-              ${(d.recentOrders || []).map(o => `<tr>
-                <td>${esc(o.code)}</td>
+              ${recent.map(o => `<tr>
+                <td>
+                  <a href="#order-detail" class="order-code-link" onclick="event.preventDefault();navigate('order-detail',{id:'${o.id}'})">${esc(o.code)}</a>
+                </td>
                 <td>${esc(o.customer_name || '')}</td>
                 <td class="num">${fmt(o.total)}₫</td>
                 <td>${statusBadge(o.status)}</td>
                 <td>${formatDate(o.created_at)}</td>
+                <td>
+                  <button class="btn btn-outline btn-sm" onclick="navigate('order-detail',{id:'${o.id}'})">Xem chi tiết</button>
+                </td>
               </tr>`).join('')}
             </tbody>
-          </table>
+          </table>` : `<p class="empty-hint">Chưa có đơn hàng.</p>`}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger)">Lỗi: ${e.message}</p>`;
+  }
+}
+
+function slowReason(p) {
+  if (!p.quantity) {
+    if (p.views > 0) return 'Nhiều lượt xem, chưa có đơn — cần đẩy';
+    if (p.cart_adds > 0) return 'Đã thêm giỏ, chưa chốt đơn — cần đẩy';
+    return 'Chưa bán trong tháng — cần đẩy';
+  }
+  if (p.views >= 10 && p.quantity < 3) return 'Xem nhiều, bán ít — cần đẩy';
+  return 'Bán chậm trong tháng — cần đẩy';
+}
+
+function analyticsTable(rows, empty, cols) {
+  if (!rows.length) return `<p class="empty-hint">${empty}</p>`;
+  return `<table>
+    <thead><tr>${cols.map(c => `<th>${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.cell(r)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function renderAnalytics(el) {
+  el.innerHTML = '<p>Đang tải...</p>';
+  try {
+    const data = await api('GET', '/admin/analytics');
+    const d = data.data;
+    const weekLabel = d.weekStart ? new Date(d.weekStart).toLocaleDateString('vi-VN') : '';
+    const monthLabel = d.monthStart ? new Date(d.monthStart).toLocaleDateString('vi-VN') : '';
+    const maxBest = Math.max(1, ...(d.bestSellers || []).map(p => p.quantity || 0));
+    el.innerHTML = `
+      <p class="analytics-period">Tuần này từ ${esc(weekLabel)} · Tháng này từ ${esc(monthLabel)} (giờ Việt Nam). Đơn hủy không tính.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><span class="value">${fmt(d.unitsWeek)}</span><span class="label">Số lượng bán trong tuần</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.unitsMonth)}</span><span class="label">Số lượng bán trong tháng</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.viewsMonth)}</span><span class="label">Lượt xem sản phẩm trong tháng</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.cartQtyMonth)}</span><span class="label">Số lượng thêm vào giỏ hàng (tháng)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.voucherMonth)}₫</span><span class="label">Giá trị voucher khách đã dùng (tháng)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.voucherWeek)}₫</span><span class="label">Giá trị voucher trong tuần</span></div>
+      </div>
+      <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        <div class="stat-card"><span class="value">${fmt(d.ordersWeek)}</span><span class="label">Đơn trong tuần</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.ordersMonth)}</span><span class="label">Đơn trong tháng</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.revenueWeek)}₫</span><span class="label">Doanh thu tuần</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.revenueMonth)}₫</span><span class="label">Doanh thu tháng</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.voucherOrdersMonth)}</span><span class="label">Đơn dùng voucher (tháng)</span></div>
+        <div class="stat-card"><span class="value">${fmt(d.cartEventsMonth)}</span><span class="label">Lần bấm thêm giỏ (tháng)</span></div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h3>Sản phẩm bán chạy (tháng)</h3></div>
+          <div class="table-wrap">
+            ${(d.bestSellers || []).length ? `<table>
+              <thead><tr><th>Sản phẩm</th><th>Phân loại</th><th>Số lượng</th><th>Doanh thu</th></tr></thead>
+              <tbody>
+                ${(d.bestSellers || []).map(p => `<tr>
+                  <td>
+                    <div>${esc(p.name)}</div>
+                    <div class="rank-bar"><span style="width:${Math.round((p.quantity / maxBest) * 100)}%"></span></div>
+                  </td>
+                  <td>${esc(p.variant || '—')}</td>
+                  <td class="num">${fmt(p.quantity)}</td>
+                  <td class="num">${fmt(p.revenue)}₫</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>` : `<p class="empty-hint">Chưa có đơn hàng trong tháng.</p>`}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Sản phẩm bán chậm — cần đẩy (tháng)</h3></div>
+          <div class="table-wrap">
+            ${(d.slowSellers || []).length ? `<table>
+              <thead><tr><th>Sản phẩm</th><th>Đã bán</th><th>Xem</th><th>Thêm giỏ</th><th>Gợi ý</th></tr></thead>
+              <tbody>
+                ${(d.slowSellers || []).map(p => `<tr>
+                  <td>${esc(p.name)}</td>
+                  <td class="num">${fmt(p.quantity)}</td>
+                  <td class="num">${fmt(p.views)}</td>
+                  <td class="num">${fmt(p.cart_adds)}</td>
+                  <td><span class="push-tag">${esc(slowReason(p))}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>` : `<p class="empty-hint">Chưa có sản phẩm đang bán.</p>`}
+          </div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h3>Lượt xem sản phẩm trong tháng</h3></div>
+          <div class="table-wrap">
+            ${analyticsTable(d.topViews || [], 'Chưa ghi nhận lượt xem. Số liệu bắt đầu sau khi app được cập nhật.', [
+              { h: 'Sản phẩm', cell: p => esc(p.name) },
+              { h: 'Lượt xem', num: true, cell: p => fmt(p.views) },
+            ])}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Sản phẩm được thêm vào giỏ (tháng)</h3></div>
+          <div class="table-wrap">
+            ${analyticsTable(d.topCart || [], 'Chưa ghi nhận thêm giỏ. Số liệu bắt đầu sau khi app được cập nhật.', [
+              { h: 'Sản phẩm', cell: p => esc(p.name) },
+              { h: 'Số lượng', num: true, cell: p => fmt(p.quantity) },
+              { h: 'Số lần', num: true, cell: p => fmt(p.times) },
+            ])}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Giá trị voucher khách hàng đã sử dụng (tháng)</h3></div>
+        <div class="table-wrap">
+          ${(d.voucherUsage || []).length ? `<table>
+            <thead><tr><th>Mã</th><th>Tên</th><th>Số đơn dùng</th><th>Giá trị giảm</th></tr></thead>
+            <tbody>
+              ${(d.voucherUsage || []).map(v => `<tr>
+                <td><strong>${esc(v.code)}</strong></td>
+                <td>${esc(v.label || '')}</td>
+                <td class="num">${fmt(v.uses)}</td>
+                <td class="num">${fmt(v.discount)}₫</td>
+              </tr>`).join('')}
+              <tr>
+                <td colspan="2"><strong>Tổng</strong></td>
+                <td class="num"><strong>${fmt(d.voucherOrdersMonth)}</strong></td>
+                <td class="num"><strong>${fmt(d.voucherMonth)}₫</strong></td>
+              </tr>
+            </tbody>
+          </table>` : `<p class="empty-hint">Chưa có đơn nào dùng voucher trong tháng.</p>`}
         </div>
       </div>
     `;

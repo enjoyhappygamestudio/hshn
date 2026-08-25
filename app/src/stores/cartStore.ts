@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { CartItem, Voucher, Product } from '../types';
+import { trackAddToCart } from '../services/api';
 
 interface CartStore {
   items: CartItem[];
@@ -55,6 +56,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         ],
       });
     }
+    trackAddToCart(product.id, quantity);
   },
 
   removeItem: (productId) => {

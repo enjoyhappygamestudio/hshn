@@ -17,7 +17,7 @@ import { useCartStore } from '../stores/cartStore';
 import { colors, radii, commonStyles } from '../constants/theme';
 import { formatMoney } from '../utils/format';
 import { Product, ProductVideo } from '../types';
-import { fetchProductDetail, fetchProductVideos } from '../services/api';
+import { fetchProductDetail, fetchProductVideos, trackProductView } from '../services/api';
 import { mediaUrl } from '../utils/media';
 import { BackButton } from '../components/BackButton';
 import { MediaImage } from '../components/MediaImage';
@@ -50,6 +50,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         const p = await fetchProductDetail(pid);
         setProduct(p);
         setVariants(p.variants || []);
+        trackProductView(pid);
         const vids = await fetchProductVideos(pid);
         setVideos(vids);
       } catch {
