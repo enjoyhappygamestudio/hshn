@@ -186,7 +186,7 @@ CREATE INDEX idx_notifications_customer ON notifications(customer_id, read);
 CREATE OR REPLACE FUNCTION generate_order_code()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.code := 'HSHN-' || TO_CHAR(NOW(), 'YYMMDD') || '-' || LPAD(CAST(FLOR(RANDOM() * 99999) AS TEXT), 5, '0');
+  NEW.code := 'HSHN-' || TO_CHAR(NOW(), 'YYMMDD') || '-' || LPAD(CAST(FLOOR(RANDOM() * 99999) AS TEXT), 5, '0');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
