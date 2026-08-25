@@ -7,12 +7,11 @@ import {
   StyleSheet,
   Platform,
   StatusBar,
-  Image,
   Dimensions,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProductCard } from '../components/ProductCard';
+import { MediaImage, prefetchMedia } from '../components/MediaImage';
 import { BottomNav } from '../components/BottomNav';
 import { HomeSkeleton } from '../components/SkeletonLoader';
 import { EmptyState } from '../components/EmptyState';
@@ -86,6 +85,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setCategories(cats);
       setFeaturedVideos(videos);
       setHasError(false);
+      const previewUrls = [
+        ...prods.slice(0, 12).map((p) => mediaUrl(p.images?.[0])),
+        ...videos.slice(0, 4).map((v) => mediaUrl(v.thumbnail_url)),
+      ];
+      prefetchMedia(previewUrls);
     } catch (e: any) {
       if (__DEV__) console.log('[Home] error:', e.message);
       setHasError(true);
@@ -301,8 +305,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.videoHScroll}
             >
-              {featuredVideos.slice(0, 2).map((video, idx) => {
-                const vidUrl = mediaUrl(video.url) || '';
+              {featuredVideos.slice(0, 2).map((video) => {
                 const thumbUrl = mediaUrl(video.thumbnail_url);
                 return (
                   <TouchableOpacity
@@ -315,17 +318,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     }}
                   >
                     <View style={styles.videoHThumbWrap}>
-                      {idx === 0 ? (
-                        <Video
-                          source={{ uri: vidUrl }}
-                          style={styles.videoHThumb}
-                          resizeMode={ResizeMode.COVER}
-                          shouldPlay
-                          isMuted
-                          isLooping
-                        />
-                      ) : thumbUrl ? (
-                        <Image source={{ uri: thumbUrl }} style={styles.videoHThumb} />
+                      {thumbUrl ? (
+                        <MediaImage uri={thumbUrl} style={styles.videoHThumb} />
                       ) : (
                         <View style={[styles.videoHThumb, { backgroundColor: video.product_image_bg || '#DCEFEC', justifyContent: 'center', alignItems: 'center' }]}>
                           <Text style={{ fontSize: 28 }}>{video.product_emoji || '🎬'}</Text>
@@ -443,7 +437,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   searchText: { fontSize: 13.5, color: colors.muted },
-  videoSection: { paddingTop: 14, paddingBottom: 4, paddingHorizontal: 14 },
+  videoSection: { paddingTop: 16, paddingBottom: 8, paddingHorizontal: 14 },
   videoHScroll: { gap: 8, paddingBottom: 4 },
   videoHCard: {
     width: VIDEO_CARD_W,
@@ -469,10 +463,10 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
   },
   videoHViewsText: { color: '#fff', fontSize: 9 },
-  videoHInfo: { padding: 8, gap: 2 },
-  videoHShop: { fontSize: 10, color: colors.muted },
-  videoHName: { fontSize: 12, fontWeight: '700', color: colors.navy },
-  videoHPrice: { fontSize: 12, fontWeight: '800', color: colors.coral, fontFamily: fonts.numeric },
+  videoHInfo: { padding: 10, gap: 3 },
+  videoHShop: { fontSize: 10.5, lineHeight: 14, color: colors.muted },
+  videoHName: { fontSize: 12.5, lineHeight: 17, fontWeight: '700', color: colors.navy },
+  videoHPrice: { fontSize: 13.5, fontWeight: '800', color: colors.coral, fontFamily: fonts.numeric },
   catWrap: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 4 },
   catArrowSlot: {
     width: CAT_ARROW_SLOT,
@@ -518,10 +512,29 @@ const styles = StyleSheet.create({
   catNameActive: { color: colors.primary, fontWeight: '800' },
   clearFilter: { paddingHorizontal: 18, paddingBottom: 4 },
   clearFilterText: { fontSize: 12, color: colors.primary, fontWeight: '700' },
-  section: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontWeight: '800', color: colors.navy, fontSize: 15 },
-  sectionLink: { fontSize: 12, color: colors.primary, fontWeight: '700' },
+  section: { paddingHorizontal: 14, paddingTop: 18, paddingBottom: 6 },
+  sectionHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 42,
+    marginBottom: 2,
+  },
+  sectionTitle: {
+    fontWeight: '800',
+    color: colors.navy,
+    fontSize: 17,
+    lineHeight: 23,
+    letterSpacing: 0.2,
+  },
+  sectionLink: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.primary,
+    fontWeight: '700',
+    paddingVertical: 6,
+    paddingLeft: 10,
+  },
   grid2: {
     flexDirection: 'row',
     flexWrap: 'wrap',

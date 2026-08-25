@@ -4,15 +4,13 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Pressable,
-  Platform,
-  Image,
 } from 'react-native';
 import { Product } from '../types';
 import { colors, radii, shadows, fonts } from '../constants/theme';
 import { formatMoney } from '../utils/format';
 import { mediaUrl } from '../utils/media';
 import { useCartStore } from '../stores/cartStore';
+import { MediaImage } from './MediaImage';
 
 interface ProductCardProps {
   product: Product;
@@ -61,7 +59,7 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(
             </View>
           )}
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.productImage} />
+            <MediaImage uri={imageUri} style={styles.productImage} />
           ) : (
             <Text style={styles.emoji}>{product.emoji}</Text>
           )}

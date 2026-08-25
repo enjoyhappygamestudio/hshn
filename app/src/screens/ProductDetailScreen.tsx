@@ -8,7 +8,6 @@ import {
   StatusBar,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ResizeMode, Video } from 'expo-av';
@@ -21,6 +20,7 @@ import { Product, ProductVideo } from '../types';
 import { fetchProductDetail, fetchProductVideos } from '../services/api';
 import { mediaUrl } from '../utils/media';
 import { BackButton } from '../components/BackButton';
+import { MediaImage } from '../components/MediaImage';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -116,8 +116,10 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                 style={{ width: SCREEN_W, height: 260 }}
                 resizeMode={ResizeMode.CONTAIN}
                 isLooping
-                shouldPlay
+                shouldPlay={false}
                 isMuted
+                usePoster
+                posterSource={{ uri: mediaUrl(videos[videoIndex]?.thumbnail_url) || undefined }}
               />
               <TouchableOpacity
                 style={styles.fullscreenBtn}
@@ -193,9 +195,9 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
               )}
             </View>
           ) : product?.images && product.images.length > 0 ? (
-            <Image
-              source={{ uri: product.images[0] }}
-              style={{ width: SCREEN_W, height: 260, resizeMode: 'cover' }}
+            <MediaImage
+              uri={mediaUrl(product.images[0])}
+              style={{ width: SCREEN_W, height: 260 }}
             />
           ) : (
             <Text style={styles.galleryEmoji}>{product?.emoji || '🦞'}</Text>

@@ -262,24 +262,25 @@ export const TrackingScreen: React.FC<TrackingScreenProps> = ({ navigation, rout
     return base.map((s, i) => ({ ...s, done: i === 0, active: i === 1 }));
   }, [order]);
 
-  const etaText = useMemo(() => {
-    if (order?.status === 'cancelled') return 'Đơn hàng đã bị hủy';
-    if (order?.status === 'pending') return 'Chờ cửa hàng xác nhận đơn hàng';
-    if (order?.status === 'hard_to_ship') return 'Chưa có tài xế nhận đơn — vui lòng gọi cửa hàng để được hỗ trợ';
-    if (order?.status === 'customer_refused') return 'Khách không nhận đơn — vui lòng liên hệ cửa hàng';
-    if (order?.status === 'exchanged') return 'Đơn đã đổi hàng thành công';
-    if (order?.status === 'returned') return 'Đơn đã bị trả hàng';
+  const eta = useMemo(() => {
+    const status = { label: 'Trạng thái' };
+    if (order?.status === 'cancelled') return { ...status, value: 'Đã hủy' };
+    if (order?.status === 'pending') return { ...status, value: 'Chờ cửa hàng xác nhận' };
+    if (order?.status === 'hard_to_ship') return { ...status, value: 'Chưa có tài xế nhận đơn' };
+    if (order?.status === 'customer_refused') return { ...status, value: 'Khách không nhận đơn' };
+    if (order?.status === 'exchanged') return { ...status, value: 'Đã đổi hàng' };
+    if (order?.status === 'returned') return { ...status, value: 'Đã trả hàng' };
     const s = live?.status || '';
-    if (s === 'COMPLETED') return 'Đơn đã giao thành công';
-    if (s === 'ASSIGNING' || !live?.driver) return 'Đang tìm tài xế gần nhất…';
-    if (s === 'ACCEPTED') return 'Tài xế đang đến lấy hàng';
+    if (s === 'COMPLETED') return { ...status, value: 'Đã giao thành công' };
+    if (s === 'ASSIGNING' || !live?.driver) return { ...status, value: 'Đang tìm tài xế…' };
+    if (s === 'ACCEPTED') return { ...status, value: 'Tài xế đang đến lấy hàng' };
     if (s === 'IN PROCESS' && live.durationSec && (live.timestamps?.boarded || live.timestamps?.pickedUp)) {
       const start = live.timestamps?.boarded || live.timestamps?.pickedUp || 0;
       const remaining = Math.max(0, live.durationSec - (Date.now() / 1000 - start));
       const mins = Math.max(1, Math.round(remaining / 60));
-      return `Tài xế sẽ đến trong khoảng ${mins} phút`;
+      return { label: 'Tài xế sẽ đến trong khoảng', value: `${mins} phút` };
     }
-    return 'Đang cập nhật vị trí';
+    return { ...status, value: 'Đang cập nhật vị trí' };
   }, [live, order]);
 
   const driverLabel = useMemo(() => {
@@ -462,10 +463,8 @@ export const TrackingScreen: React.FC<TrackingScreenProps> = ({ navigation, rout
           )}
 
           <View style={styles.etaBanner}>
-            <Text style={styles.etaLabel}>
-              {order?.status === 'cancelled' ? 'Trạng thái' : 'Tài xế sẽ đến trong khoảng'}
-            </Text>
-            <Text style={styles.etaValue}>{etaText}</Text>
+            <Text style={styles.etaLabel}>{eta.label}</Text>
+            <Text style={styles.etaValue}>{eta.value}</Text>
           </View>
 
           <View style={styles.steps}>
@@ -522,7 +521,7 @@ export const TrackingScreen: React.FC<TrackingScreenProps> = ({ navigation, rout
             </View>
             <View style={styles.orderRow}>
               <Text style={styles.orderLabel}>Địa chỉ giao</Text>
-              <Text style={[styles.orderValue, { maxWidth: 190, textAlign: 'right' }]}>{deliveryAddress}</Text>
+              <Text style={styles.orderValue}>{deliveryAddress}</Text>
             </View>
           </View>
 
@@ -697,6 +696,7 @@ const styles = StyleSheet.create({
   etaBanner: {
     marginHorizontal: 16,
     marginTop: 14,
+    gap: 12,
     backgroundColor: colors.mint,
     borderRadius: 12,
     padding: 12,
@@ -704,8 +704,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  etaLabel: { fontSize: 12, color: colors.muted },
-  etaValue: { fontFamily: 'Inter', fontWeight: '800', color: colors.primary, fontSize: 16, maxWidth: 220, textAlign: 'right' },
+  etaLabel: { fontSize: 12, color: colors.muted, flexShrink: 0 },
+  etaValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontFamily: 'Inter',
+    fontWeight: '800',
+    color: colors.primary,
+    fontSize: 15,
+    lineHeight: 21,
+  },
   steps: {
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -779,9 +787,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
+    gap: 12,
   },
-  orderLabel: { fontSize: 12.5, color: colors.muted },
-  orderValue: { fontWeight: '800', color: colors.navy, fontFamily: 'Inter', fontSize: 12.5 },
+  orderLabel: { fontSize: 12.5, color: colors.muted, flexShrink: 0 },
+  orderValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '800',
+    color: colors.navy,
+    fontFamily: 'Inter',
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
   itemsCard: {
     marginHorizontal: 16,
     marginTop: 14,

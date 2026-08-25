@@ -7,12 +7,13 @@ import {
   StyleSheet,
   Alert,
   StatusBar,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VoucherCard } from '../components/VoucherCard';
 import { EmptyState } from '../components/EmptyState';
 import { BottomNav } from '../components/BottomNav';
+import { MediaImage } from '../components/MediaImage';
+import { mediaUrl } from '../utils/media';
 import { useCartStore } from '../stores/cartStore';
 import { colors, radii, fonts, commonStyles } from '../constants/theme';
 import { formatMoney } from '../utils/format';
@@ -103,7 +104,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
           <View key={item.productId} style={styles.cartItem}>
             <View style={[styles.thumb, { backgroundColor: item.imageBg || colors.mint }]}>
               {item.image ? (
-                <Image source={{ uri: item.image }} style={styles.thumbImg} />
+                <MediaImage uri={mediaUrl(item.image) || item.image} style={styles.thumbImg} />
               ) : (
                 <Text style={styles.thumbEmoji}>{item.emoji}</Text>
               )}

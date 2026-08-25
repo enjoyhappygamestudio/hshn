@@ -9,6 +9,7 @@
     "stop": "bash scripts/stop.sh",
     "stop:all": "bash scripts/stop.sh all",
     "status": "bash scripts/status.sh",
+    "bench:media": "node scripts/bench-media.mjs",
     "dev:expo": "npm --prefix app start"
   }
 }

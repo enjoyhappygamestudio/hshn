@@ -7,7 +7,6 @@ import {
   FlatList,
   StyleSheet,
   StatusBar,
-  Image,
   Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,8 @@ import { Product } from '../types';
 import { fetchProducts } from '../services/api';
 import { formatMoney } from '../utils/format';
 import { BackButton } from '../components/BackButton';
+import { MediaImage } from '../components/MediaImage';
+import { mediaUrl } from '../utils/media';
 
 interface SearchScreenProps {
   navigation: any;
@@ -70,7 +71,7 @@ export const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         >
           <View style={[styles.thumb, { backgroundColor: item.imageBg || colors.mint }]}>
             {img ? (
-              <Image source={{ uri: img }} style={styles.thumbImg} />
+              <MediaImage uri={mediaUrl(img) || img} style={styles.thumbImg} />
             ) : (
               <Text style={styles.thumbEmoji}>{item.emoji}</Text>
             )}

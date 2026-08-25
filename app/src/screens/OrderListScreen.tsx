@@ -8,7 +8,6 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import { fetchOrders } from '../services/api';
 import { formatMoney } from '../utils/format';
 import { BottomNav } from '../components/BottomNav';
 import { mediaUrl } from '../utils/media';
+import { MediaImage } from '../components/MediaImage';
 
 interface OrderListScreenProps {
   navigation: any;
@@ -93,7 +93,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
       onPress={() => navigation.navigate('Tracking', { orderCode: item.code })}
     >
       <View style={styles.orderHeader}>
-        <Text style={styles.orderCode}>#{item.code}</Text>
+        <Text style={styles.orderCode} numberOfLines={1}>#{item.code}</Text>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] + '20' }]}>
           <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
             {STATUS_LABELS[item.status] || item.status}
@@ -110,7 +110,7 @@ export const OrderListScreen: React.FC<OrderListScreenProps> = ({ navigation }) 
           return (
             <View key={i} style={styles.itemThumb}>
               {imgUrl ? (
-                <Image source={{ uri: imgUrl }} style={styles.itemImg} />
+                <MediaImage uri={imgUrl} style={styles.itemImg} />
               ) : (
                 <View style={[styles.itemImg, styles.itemImgDefault]}>
                   <Text style={{ fontSize: 22 }}>🦐</Text>
@@ -194,9 +194,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
   },
-  orderCode: { fontWeight: '700', fontSize: 14, color: colors.navy },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
+  orderCode: { fontWeight: '700', fontSize: 14, color: colors.navy, flexShrink: 1 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, flexShrink: 0 },
   statusText: { fontSize: 11, fontWeight: '700' },
   itemRow: { fontSize: 13, color: colors.muted, marginBottom: 2 },
   itemsRow: { flexDirection: 'row', gap: 6, marginBottom: 6 },

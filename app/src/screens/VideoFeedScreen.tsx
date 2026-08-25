@@ -6,10 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  Image,
   Dimensions,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radii, shadows, fonts } from '../constants/theme';
 import { mediaUrl } from '../utils/media';
@@ -17,6 +15,7 @@ import { FeaturedVideo } from '../types';
 import { formatMoney } from '../utils/format';
 import { recordVideoView } from '../services/api';
 import { BackButton } from '../components/BackButton';
+import { MediaImage } from '../components/MediaImage';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GAP = 10;
@@ -52,10 +51,7 @@ export const VideoFeedScreen: React.FC<VideoFeedScreenProps> = ({ navigation, ro
           >
             <View style={styles.thumbWrap}>
               {video.thumbnail_url ? (
-                <Image
-                  source={{ uri: mediaUrl(video.thumbnail_url) || undefined }}
-                  style={styles.thumb}
-                />
+                <MediaImage uri={mediaUrl(video.thumbnail_url)} style={styles.thumb} />
               ) : (
                 <View style={[styles.thumb, { backgroundColor: video.product_image_bg || '#DCEFEC', justifyContent: 'center', alignItems: 'center' }]}>
                   <Text style={{ fontSize: 36 }}>{video.product_emoji || '🎬'}</Text>

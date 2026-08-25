@@ -24,9 +24,9 @@ export const SuccessScreen: React.FC<SuccessScreenProps> = ({ navigation, route 
   const orderCode = route?.params?.orderCode;
 
   const slotLabel = () => {
-    if (delivery.mode === 'hoatoc') return 'Siêu tốc — ưu tiên trong 30 phút';
-    if (delivery.mode === 'express2h') return 'Siêu tốc - tiết kiệm — trong 1 giờ';
-    if (delivery.mode === 'interprovince') return '4H — siêu rẻ trong 4 giờ';
+    if (delivery.mode === 'hoatoc') return 'Siêu tốc (30 phút)';
+    if (delivery.mode === 'express2h') return 'Siêu tốc tiết kiệm (1 giờ)';
+    if (delivery.mode === 'interprovince') return '4H siêu rẻ (4 giờ)';
     if (delivery.mode === 'appointment' && delivery.date && delivery.timeSlot) {
       const t = TIME_SLOTS.find((x) => x.value === delivery.timeSlot);
       return `${formatDateVN(delivery.date)}, ${t ? t.label : ''}`;
@@ -133,9 +133,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 8,
   },
-  codeRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  codeLabel: { fontSize: 12.5, color: colors.muted },
-  codeValue: { fontWeight: '800', color: colors.navy, fontFamily: fonts.numeric, fontSize: 12.5 },
+  codeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  codeLabel: { fontSize: 12.5, color: colors.muted, flexShrink: 0 },
+  codeValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontWeight: '800',
+    color: colors.navy,
+    fontFamily: fonts.numeric,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
   primaryBtn: {
     width: '100%',
     height: 48,

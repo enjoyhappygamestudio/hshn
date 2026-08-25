@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  Image,
   Dimensions,
   TextInput,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav } from '../components/BottomNav';
+import { MediaImage } from '../components/MediaImage';
 import { useCartStore } from '../stores/cartStore';
 import { colors, radii, shadows, fonts, commonStyles } from '../constants/theme';
 import { FeaturedVideo } from '../types';
@@ -35,7 +34,6 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const cartCount = useCartStore((s) => s.count());
-  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     if (__DEV__) console.log('[VideoTab] mounting...');
@@ -50,10 +48,6 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
       }
     })();
   }, []);
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.playAsync();
-  }, [videos]);
 
   const filtered = (() => {
     let list = [...videos];
@@ -77,7 +71,6 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
   })();
 
   const firstVideo = videos[0];
-  const firstVidUrl = mediaUrl(firstVideo?.url) || '';
   const firstThumbUrl = mediaUrl(firstVideo?.thumbnail_url);
 
   const handleTabPress = useCallback(
@@ -107,15 +100,13 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
             }}
           >
             <View style={styles.heroWrap}>
-              <Video
-                ref={videoRef}
-                source={{ uri: firstVidUrl }}
-                style={styles.heroVideo}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isMuted
-                isLooping
-              />
+              {firstThumbUrl ? (
+                <MediaImage uri={firstThumbUrl} style={styles.heroVideo} />
+              ) : (
+                <View style={[styles.heroVideo, { backgroundColor: firstVideo.product_image_bg || '#DCEFEC', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ fontSize: 48 }}>{firstVideo.product_emoji || '🎬'}</Text>
+                </View>
+              )}
               <View style={styles.heroOverlay}>
                 <Text style={styles.heroPlayBtn}>▶</Text>
               </View>
@@ -181,7 +172,7 @@ export const VideoTabScreen: React.FC<VideoTabScreenProps> = ({ navigation }) =>
               >
                 <View style={styles.thumbWrap}>
                   {thumbUrl ? (
-                    <Image source={{ uri: thumbUrl }} style={styles.thumb} />
+                    <MediaImage uri={thumbUrl} style={styles.thumb} />
                   ) : (
                     <View style={[styles.thumb, { backgroundColor: video.product_image_bg || '#DCEFEC', justifyContent: 'center', alignItems: 'center' }]}>
                       <Text style={{ fontSize: 36 }}>{video.product_emoji || '🎬'}</Text>
