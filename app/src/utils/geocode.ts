@@ -174,15 +174,24 @@ export async function geocodeAddress(address: string): Promise<GeoPoint | null> 
   return null;
 }
 
-export async function searchAddressSuggestions(
-  query: string,
-): Promise<AddressSuggestion[]> {
-  if (!query || query.trim().length < 3) return [];
-  const q = query.trim();
+const HANOI_BBOX = '105.6,20.85,106.1,21.15';
 
+function toSuggestion(full: string, lat: number, lng: number, id: string): AddressSuggestion {
+  const parts = full.split(',').map((p: string) => p.trim()).filter(Boolean);
+  const withCity = /Hà Nội|Ha Noi/i.test(full) ? full : `${full}, Hà Nội, Việt Nam`;
+  return {
+    id,
+    name: parts.slice(0, 2).join(', '),
+    full: withCity,
+    lat,
+    lng,
+  };
+}
+
+async function suggestNominatim(q: string): Promise<AddressSuggestion[]> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=10&countrycodes=vn&viewbox=105.6,21.15,106.1,20.85&bounded=1&q=${encodeURIComponent(q)}`,
+      `https://nominatim.openstreetmap.org/search?format=json&limit=10&countrycodes=vn&viewbox=${HANOI_BBOX}&bounded=1&q=${encodeURIComponent(q)}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -195,18 +204,43 @@ export async function searchAddressSuggestions(
     if (!Array.isArray(data)) return [];
     return data
       .filter((d: any) => d.lat && d.lon && d.display_name)
-      .map((d: any) => {
-        const display: string = d.display_name;
-        const parts = display.split(',').map((p: string) => p.trim());
-        return {
-          id: String(d.place_id),
-          name: parts.slice(0, 2).join(', '),
-          full: display,
-          lat: parseFloat(d.lat),
-          lng: parseFloat(d.lon),
-        };
+      .map((d: any) => toSuggestion(d.display_name, parseFloat(d.lat), parseFloat(d.lon), String(d.place_id)));
+  } catch {
+    return [];
+  }
+}
+
+async function suggestPhoton(q: string): Promise<AddressSuggestion[]> {
+  try {
+    const res = await fetch(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=10&bbox=${HANOI_BBOX}`,
+      { headers: { 'Accept': 'application/json' } },
+    );
+    if (!res.ok) return [];
+    const data: any = await res.json();
+    const feats: any[] = data?.features || [];
+    return feats
+      .filter((f: any) => f.geometry?.coordinates && f.properties?.name)
+      .map((f: any, i: number) => {
+        const coords = f.geometry.coordinates;
+        const props = f.properties;
+        const parts = [props.name, props.street, props.district, props.city, props.state, props.country]
+          .filter(Boolean)
+          .map((p: string) => p.trim());
+        return toSuggestion(parts.join(', '), coords[1], coords[0], String(props.osm_id || i));
       });
   } catch {
     return [];
   }
+}
+
+export async function searchAddressSuggestions(
+  query: string,
+): Promise<AddressSuggestion[]> {
+  if (!query || query.trim().length < 3) return [];
+  const q = query.trim();
+
+  const results = await suggestNominatim(q);
+  if (results.length > 0) return results;
+  return suggestPhoton(q);
 }

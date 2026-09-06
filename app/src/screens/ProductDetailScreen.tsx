@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ResizeMode, Video } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { QuantityStepper } from '../components/QuantityStepper';
 import { ActionBar } from '../components/ActionBar';
 import { useCartStore } from '../stores/cartStore';
@@ -41,7 +41,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [videos, setVideos] = useState<ProductVideo[]>([]);
   const [videoIndex, setVideoIndex] = useState(0);
-  const videoRef = useRef<Video>(null);
+  const videoUrl = videos[videoIndex]?.url ? mediaUrl(videos[videoIndex].url) : null;
+  const player = useVideoPlayer(videoUrl, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
 
   useEffect(() => {
     (async () => {
@@ -111,16 +115,11 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
         <View style={[styles.gallery, { backgroundColor: product?.imageBg || '#DCEFEC' }]}>
           {videos.length > 0 ? (
             <View style={{ width: SCREEN_W, height: 260 }}>
-              <Video
-                ref={videoRef}
-                source={{ uri: mediaUrl(videos[videoIndex]?.url) || '' }}
+              <VideoView
+                player={player}
                 style={{ width: SCREEN_W, height: 260 }}
-                resizeMode={ResizeMode.CONTAIN}
-                isLooping
-                shouldPlay={false}
-                isMuted
-                usePoster
-                posterSource={{ uri: mediaUrl(videos[videoIndex]?.thumbnail_url) || undefined }}
+                contentFit="contain"
+                nativeControls={false}
               />
               <TouchableOpacity
                 style={styles.fullscreenBtn}
@@ -189,7 +188,7 @@ export const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
                     <TouchableOpacity
                       key={i}
                       style={[styles.videoDot, i === videoIndex && styles.videoDotActive]}
-                      onPress={() => { setVideoIndex(i); videoRef.current?.stopAsync(); }}
+                      onPress={() => { setVideoIndex(i); }}
                     />
                   ))}
                 </View>

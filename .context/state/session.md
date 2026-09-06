@@ -1,3 +1,59 @@
+# Session: 2026-09-06
+
+## Hành động
+
+```
+Mã: SHP-11
+Mô tả: Đổi màn Địa chỉ giao hàng sang ô nhập 1 dòng + gợi ý địa chỉ chính xác
+```
+
+## File đã tạo/sửa (2026-09-06)
+
+- `app/src/screens/AddressScreen.tsx` — **viết lại**: bỏ form cấu trúc (Quận/Huyện picker, Phường/Xã picker, Đường/Phố autocomplete local, Số nhà) → **1 ô nhập địa chỉ đầy đủ** + gợi ý từ `searchAddressSuggestions` (debounce 400ms, spinner trong input); chọn gợi ý → dùng thẳng lat/lng (không geocode lại, `skipGeocodeRef`); vẫn giữ map preview + trạng thái ✓/✕ + chặn Lưu khi chưa xác định vị trí
+- `app/src/utils/geocode.ts` — `searchAddressSuggestions` thêm **fallback Photon** (Nominatim hay 403 trên Android): thử Nominatim (bbox Hà Nội) trước, rỗng thì Photon (bbox tương đương); `toSuggestion` tự nối "Hà Nội, Việt Nam" nếu thiếu
+
+## Test (2026-09-06)
+
+- `npx tsc --noEmit` pass (0 lỗi)
+- `app/src/data/hanoi.ts` (30 quận + 13.950 đường) giờ không còn được import — giữ lại file, chưa xóa
+
+---
+
+# Session: 2026-09-06
+
+## Hành động
+
+```
+Mã: SHP-10
+Mô tả: Nâng cấp Expo SDK 54 → 57 (React Native 0.81 → 0.86, React 19.1 → 19.2.3)
+```
+
+## File đã tạo/sửa (2026-09-06)
+
+- `app/package.json` — `expo` ^57.0.0; **bỏ `expo-av`** (đã bị xóa khỏi SDK 55); thêm `expo-video` ~57.0.3, `expo-system-ui` ~57.0.3, `@expo/vector-icons` ^15.0.2 (SDK 56 không còn implicit dep); nâng `react` 19.2.3, `react-native` 0.86.3, `react-native-reanimated` 4.5.1, `react-native-worklets` 0.10.1, `react-native-screens` ~4.26.0, `react-native-gesture-handler` ~2.32.0, `react-native-safe-area-context` ~5.7.0, `react-native-webview` 13.16.1, `expo-*` về dải ~57.x; devDeps `@types/react` ~19.2.4, `typescript` ~6.0.3, `react-test-renderer` ^19.2.3
+- `app/src/screens/VideoPlayerScreen.tsx` — **migrate expo-av → expo-video**: `Video`/`ResizeMode` → `VideoView` + `useVideoPlayer` (loop + auto-play); `videoRef.playAsync/pauseAsync` → `player.play/pause`; bỏ `StyleSheet.absoluteFillObject` (đã bị xóa trong RN 0.86 → viết tường minh position absolute)
+- `app/src/screens/ProductDetailScreen.tsx` — **migrate expo-av → expo-video**: `Video` → `VideoView` + `useVideoPlayer` (loop + muted, không auto-play); `videoRef.stopAsync()` → bỏ (player tự recreate khi đổi source qua `useVideoPlayer`); bỏ import `useRef` thừa
+- `app/app.json` — **bỏ field `splash`** (bị xóa khỏi schema SDK 57) → chuyển sang config plugin `expo-splash-screen` (image/resizeMode/backgroundColor giữ nguyên); thêm plugin `expo-video`
+- `app/tsconfig.json` — bỏ `baseUrl` + `paths` (`@/*` không dùng) vì TS 6.0 deprecate `baseUrl`
+- `app/android/` + `app/ios/` — **regenerate bằng `npx expo prebuild --clean`** cho SDK 57 (New Architecture bắt buộc, `newArchEnabled=true`, Hermes V1); iOS lần đầu sinh project `HiSnHNi` + Podfile.lock (Expo 57.0.20, hermes-engine)
+
+## Test (2026-09-06)
+
+- `npx tsc --noEmit` pass (0 lỗi)
+- `npx expo-doctor@latest` — 20/21 pass; còn 1 cảnh báo CNG (project commit native folders + config app.json — dự kiến, không chặn)
+- `npx expo export --platform android` — bundle thành công (AppEntry-*.hbc 3.5MB)
+- `npx expo prebuild --clean` + `pod install` OK
+- Lint: `eslint` chưa cài trong node_modules (tồn đọng từ trước, không phải do upgrade)
+
+## Ghi chú
+
+- Upgrade đi qua 3 SDK: 54→55 (bỏ Legacy Architecture, bỏ expo-av, unified versioning), 55→56 (expo/fetch mặc định, Hermes V1, iOS 16.4+), 56→57 (RN 0.86, không breaking)
+- `expo/fetch` mặc định từ SDK 56 — app dùng axios nên không ảnh hưởng
+- Cần build lại dev client (`npx expo run:android` / `run:ios`) để có binary SDK 57 — Metro reload không thay thế được runtime cũ
+- Node ≥ 22.13 (đang 22.23.1 OK); iOS cần Xcode 26.4+
+
+---
+
 # Session: 2026-08-05
 
 ## Hành động

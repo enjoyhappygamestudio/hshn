@@ -1,7 +1,8 @@
 # rules/code/cong-port.md — Phân bổ cổng workspace VPS
 
 > **Bắt buộc khi chọn/đổi cổng.** Cùng nội dung ở NOXH / AppThueNha / AppBDS /
-> HaiSanHaNoi / ShopManager. Đổi bảng này → cập nhật **cả năm** bản copy trong cùng PR/task.
+> HaiSanHaNoi / ShopManager / DeviceFarm. Đổi bảng này → cập nhật **mọi** bản copy
+> trong cùng PR/task.
 
 ## Mục tiêu
 
@@ -18,6 +19,7 @@ chẩn đoán (CORS, health check “OK” nhầm app khác, Expo gọi sai API)
 | **AppBDS** (REMP) | **3300** | Web **3301** | **8004** | `/3` |
 | **ShopManager** | **3400** | — | — | — |
 | **fanpage** | **3500** | — | — | — |
+| **DeviceFarm** | **3600** | Admin **3601** | — | Compose riêng |
 
 ### Shared (không thuộc một app)
 
@@ -27,21 +29,24 @@ chẩn đoán (CORS, health check “OK” nhầm app khác, Expo gọi sai API)
 | Redis `noxh-redis` | **56379** | Dùng chung — mỗi app một DB index |
 | Mongo (chỉ AppThueNha) | **57017** | Không dùng cho dự án khác |
 
+DeviceFarm không dùng Postgres/Redis shared. Compose riêng; MinIO console host **9001**,
+tunnel host **12000–12100**. Không publish Postgres/Redis ra host.
+
 ## Quy tắc cứng
 
 1. **Cấm** gán API/Web/Expo trùng hàng khác trong bảng trên.
 2. **Cấm** dùng cổng mặc định framework nếu đã thuộc dự án khác (`3000` = NOXH API,
    không phải “Next mặc định”).
 3. Dự án mới lấy **dải kế tiếp**:
-   - API = `3600`, `3700`, … (bước 100)
-   - Web/Admin = API + 1 (`3601`, …)
+   - API = `3700`, `3800`, … (bước 100)
+   - Web/Admin = API + 1 (`3701`, …)
    - Expo Metro = `8005`, `8006`, … (tuần tự)
    - Redis index = `/4`, `/5`, … (chưa dùng)
 4. Trước khi đổi cổng: đọc bảng này → cập nhật `.env` / `scripts/lib/common.sh` /
    `package.json` / README / rule môi trường của **đúng** dự án → cập nhật bảng này
    ở **mọi** project.
-5. `scripts/lib/common.sh` (`PORT_API`, `PORT_ADMIN`, `PORT_EXPO`) phải khớp bảng;
-   không hardcode số lệch nhau giữa script và `.env`.
+5. `scripts/lib/common.sh` (`PORT_API`, `PORT_WEB`/`PORT_ADMIN`, `PORT_EXPO`) phải khớp
+   bảng; không hardcode số lệch nhau giữa script và `.env`.
 
 ## Khi nào phải đọc file này
 

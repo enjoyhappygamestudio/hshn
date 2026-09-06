@@ -19,7 +19,7 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Feather } from '@expo/vector-icons';
 import { useCartStore } from '../stores/cartStore';
 import { useAuthStore } from '../stores/authStore';
@@ -41,7 +41,6 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
   const initialIndex = route.params?.currentIndex ?? 0;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const video: FeaturedVideo = allVideos[currentIndex];
-  const videoRef = useRef<Video>(null);
   const [showUI, setShowUI] = useState(true);
   const [comments, setComments] = useState<VideoComment[]>([]);
   const [commentText, setCommentText] = useState('');
@@ -60,6 +59,10 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
 
   const vidUrl = mediaUrl(video.url) || '';
   const thumbUrl = mediaUrl(video.thumbnail_url);
+  const player = useVideoPlayer(vidUrl || null, (p) => {
+    p.loop = true;
+    p.play();
+  });
 
   const indexRef = useRef(currentIndex);
   indexRef.current = currentIndex;
@@ -120,7 +123,6 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
   ).current;
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.playAsync();
     setIsPaused(false);
     recordVideoView(video.id);
     loadComments();
@@ -163,11 +165,11 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
       }
       lastTapRef.current = 0;
       if (isPausedRef.current) {
-        videoRef.current?.playAsync();
+        player.play();
         setIsPaused(false);
         showPlayPauseIcon('play');
       } else {
-        videoRef.current?.pauseAsync();
+        player.pause();
         setIsPaused(true);
         showPlayPauseIcon('pause');
       }
@@ -178,7 +180,7 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
         toggleUI();
       }, 300);
     }
-  }, [showPlayPauseIcon]);
+  }, [showPlayPauseIcon, player]);
 
   const handleSendComment = useCallback(async () => {
     const text = commentText.trim();
@@ -405,14 +407,11 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
 
       {/* Video background */}
       <Pressable style={styles.videoWrapper} onPress={handleVideoPress}>
-        <Video
-          ref={videoRef}
-          source={{ uri: vidUrl }}
+        <VideoView
+          player={player}
           style={styles.video}
-          resizeMode={ResizeMode.CONTAIN}
-          isLooping
-          shouldPlay
-          isMuted={false}
+          contentFit="contain"
+          nativeControls={false}
         />
       </Pressable>
 
@@ -572,7 +571,7 @@ export const VideoPlayerScreen: React.FC<VideoPlayerScreenProps> = ({ navigation
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  videoWrapper: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  videoWrapper: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
   video: { width: SCREEN_W, height: SCREEN_H },
   swipeArrowWrap: {
     position: 'absolute', alignSelf: 'center', zIndex: 50,
